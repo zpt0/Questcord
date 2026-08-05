@@ -1,0 +1,15 @@
+export const QUEST_TASK_TYPES = {
+    VIDEO: ["WATCH_VIDEO", "WATCH_VIDEO_ON_MOBILE", "WATCH_VIDEO_ON_DESKTOP"],
+    PLAY: ["PLAY_ON_DESKTOP"],
+    STREAM: ["STREAM_ON_DESKTOP"],
+    ACTIVITY: ["PLAY_ACTIVITY", "ACHIEVEMENT_IN_ACTIVITY"],
+};
+export const ALL_TASK_TYPES = [
+    ...QUEST_TASK_TYPES.VIDEO,
+    ...QUEST_TASK_TYPES.PLAY,
+    ...QUEST_TASK_TYPES.STREAM,
+    ...QUEST_TASK_TYPES.ACTIVITY,
+];
+export function isVideoTask(taskType) {
+    return QUEST_TASK_TYPES.VIDEO.includes(taskType);
+}
