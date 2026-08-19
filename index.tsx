@@ -83,8 +83,8 @@ export default definePlugin({
     description: "Complete Discord quests with smart automation and real-time progress tracking",
     authors: [
         {
-            id: 344171244955893760n,
-            name: "6jt8",
+            id: 299670891875270656n,
+            name: "zpt0.dev",
         },
     ],
     tags: ["Activity", "Utility", "Fun"],
