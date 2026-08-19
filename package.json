@@ -2,7 +2,7 @@
     "name": "questcord",
     "version": "1.0.0",
     "description": "A Vencord plugin that automates Discord Quests with smart real-time progress tracking",
-    "author": "6jt8",
+    "author": "zpt0.dev",
     "license": "AGPL-3.0-only",
     "repository": {
         "type": "git",
