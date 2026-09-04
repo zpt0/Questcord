@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.1]
+
+- Dev dependency updates: eslint 10.9.1, typescript-eslint 8.68.0, @types/node 26.4.0, @vencord/discord-types 1.0.2, vitest 4.1.11, @vitest/coverage-v8 4.1.11
+- No functional changes
+
 ## [1.0.0]
 
 - Questcord initial release as a standalone plugin

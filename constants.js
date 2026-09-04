@@ -1,4 +1,4 @@
-export const PLUGIN_VERSION = "1.0.0";
+export const PLUGIN_VERSION = "1.0.1";
 export const GITHUB_REPO = "zpt0/Questcord";
 export const UPDATE_CHECK_URL = GITHUB_REPO
     ? `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`
