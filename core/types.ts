@@ -51,6 +51,8 @@ export interface QuestData {
     intervalIds: number[];
     lastProgress: number;
     targetProgress: number;
+    lastProgressAt: number;
+    stallWarned: boolean;
 }
 
 export interface SavedQuestState {

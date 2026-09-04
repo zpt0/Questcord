@@ -18,6 +18,7 @@ import {
 import { cleanupAllPills, notify } from "./ui/notifications";
 import { cleanupQuestButtonObserver, setupQuestButtonObserver } from "./ui/questButtons";
 import { cancelQuest, checkAndResumeQuests } from "./quests/manager";
+import { startStallWatchdog, stopStallWatchdog } from "./core/watchdog";
 import { settings } from "./settings";
 
 let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
@@ -117,6 +118,7 @@ export default definePlugin({
                     },
                     30 * 60 * 1000
                 );
+                startStallWatchdog();
             } else {
                 notify(
                     "Initialization Failed",
@@ -132,6 +134,7 @@ export default definePlugin({
             clearInterval(updateCheckInterval);
             updateCheckInterval = null;
         }
+        stopStallWatchdog();
         cleanupAll();
     },
 });

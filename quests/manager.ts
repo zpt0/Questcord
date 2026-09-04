@@ -321,6 +321,8 @@ export async function startQuest(questId: string) {
             intervalIds: [],
             lastProgress: 0,
             targetProgress,
+            lastProgressAt: Date.now(),
+            stallWarned: false,
         });
         await saveQuestState(questId, taskName);
         createQuestPill(questId, questName);
