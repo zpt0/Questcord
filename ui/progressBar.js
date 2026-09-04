@@ -59,6 +59,10 @@ export function updateProgressBar(questId, userId, percent) {
     updateQuestPill(questId, undefined, clampedPercent);
     const questData = activeQuests.get(key);
     if (questData) {
+        if (clampedPercent > questData.lastProgress) {
+            questData.lastProgressAt = Date.now();
+            questData.stallWarned = false;
+        }
         questData.lastProgress = clampedPercent;
     }
 }
