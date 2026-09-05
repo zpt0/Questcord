@@ -1,4 +1,4 @@
-export const PLUGIN_VERSION = "1.0.1";
+export const PLUGIN_VERSION = "1.0.2";
 export const LOG_PREFIX = "[Questcord]";
 export const GITHUB_REPO = "zpt0/Questcord";
 export const UPDATE_CHECK_URL = GITHUB_REPO
