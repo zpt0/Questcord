@@ -40,7 +40,9 @@ export function showUpdateModal(version: string, releaseNotes: string) {
         releaseNotes
             .replace(/\[MANDATORY\]/gi, "")
             .replace(/#{1,6}\s/g, "")
+            .replace(/\[([^\]]*)\]\([^)\s]+\)/g, "$1")
             .replace(/\*\*(.*?)\*\*/g, "$1")
+            .replace(/`(.*?)`/g, "$1")
             .substring(0, 150) + "...";
 
     pill.innerHTML = `
