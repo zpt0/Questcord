@@ -29,6 +29,8 @@ import { completePlayQuest } from "./play";
 import { completeStreamQuest } from "./stream";
 import { completeVideoQuest } from "./video";
 const SAVED_STATE_KEY = "questcord-active-quests";
+// Internal: saved resume entries older than this are discarded.
+const SAVED_STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export function cleanupQuest(questId: string, userId: string) {
     const key = getProgressBarKey(questId, userId);
     clearQuestTimers(questId, userId);
@@ -109,12 +111,21 @@ async function removeSavedQuestState(questId: string) {
         console.warn(`${LOG_PREFIX} Failed to remove saved quest state:`, e);
     }
 }
+export async function clearSavedQuestStates() {
+    try {
+        await DataStore.set(SAVED_STATE_KEY, []);
+        debugLog(`${LOG_PREFIX} Cleared all saved quest states`);
+    } catch (e) {
+        console.warn(`${LOG_PREFIX} Failed to clear saved quest states:`, e);
+    }
+}
 export async function checkAndResumeQuests() {
     if (!settings.store.autoResumeAfterReload) return;
     try {
         const saved: SavedQuestState[] = (await DataStore.get(SAVED_STATE_KEY)) || [];
         if (saved.length === 0) return;
         debugLog(`${LOG_PREFIX} Found ${saved.length} saved quest(s), attempting resume...`);
+        let resumedNonVideo = false;
         for (const entry of saved) {
             const quest = QuestsStore?.getQuest(entry.questId);
             if (!quest) {
@@ -130,6 +141,31 @@ export async function checkAndResumeQuests() {
                 );
                 await removeSavedQuestState(entry.questId);
                 continue;
+            }
+            if (Date.now() - entry.startedAt > SAVED_STATE_MAX_AGE_MS) {
+                debugLog(
+                    `${LOG_PREFIX} Quest ${entry.questId} saved state expired, removing saved state`
+                );
+                await removeSavedQuestState(entry.questId);
+                continue;
+            }
+            if (!isVideoTask(entry.taskType)) {
+                let conflict = resumedNonVideo;
+                if (!conflict) {
+                    for (const [, data] of activeQuests.entries()) {
+                        if (data.isProcessing && !isVideoTask(data.taskType)) {
+                            conflict = true;
+                            break;
+                        }
+                    }
+                }
+                if (conflict) {
+                    debugLog(
+                        `${LOG_PREFIX} Quest ${entry.questId} skipped on resume (parallel conflict), keeping saved state`
+                    );
+                    continue;
+                }
+                resumedNonVideo = true;
             }
             const expiresAt = quest.config?.expiresAt ?? quest.expiresAt;
             if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
