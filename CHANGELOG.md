@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.1]
+
+- Fix duplicated version/update block in plugin settings (removed redundant `versionInfo` component setting, the custom settings panel already shows it)
+
 ## [1.1.0]
 
 - Unified API retry policy: GET requests now retry on 429/5xx/network errors with `Retry-After` support, exponential backoff and jitter; auth errors (401/403) fail fast
