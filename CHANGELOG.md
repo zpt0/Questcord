@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3]
+
+- Update system ported 1:1 from Clonecord: proper update modal (Current → New, rendered release notes) with Not Now / Discord / Update Now buttons instead of the progress pill
+- Update check now runs once on startup (dismiss checked before fetching, silent on failure), 30-minute polling removed
+- New "View Releases" link and manual "Check for Updates" button in settings
+- Removed unused `checkForUpdate` helper
+
 ## [1.1.2]
 
 - Dev dependency updates: vitest 5.0.1, @vitest/coverage-v8 5.0.1, typescript-eslint 8.70.0, @types/node 26.6.2, @types/react 19.3.0 (pinned via npm override for the exact peer requirement in @vencord/discord-types)
