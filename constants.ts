@@ -8,5 +8,5 @@ export const GITHUB_RELEASE_URL = GITHUB_REPO
     ? `https://github.com/${GITHUB_REPO}/releases/latest`
     : "";
 export const UPDATE_CHECK_ENABLED = !!GITHUB_REPO;
-export const UPDATES_CHANNEL_ID = "1475958964146409554";
+export const UPDATES_CHANNEL_ID = "1532348047697121340";
 export const SUPPORT_INVITE_CODE = "9ra6MwHTHy";
