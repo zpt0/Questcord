@@ -32,6 +32,12 @@ export const settings = definePluginSettings({
         description: "Automatically dismiss quest video and mobile QR code popups",
         default: true,
     },
+    autoRestartStalled: {
+        type: OptionType.BOOLEAN,
+        description:
+            "Automatically restart quest automation once when progress stalls (off by default)",
+        default: false,
+    },
 
     // ── Debug (visible in Vencord settings) ──
     debugMode: {
