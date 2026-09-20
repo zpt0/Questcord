@@ -17,8 +17,8 @@ import {
 } from "./core/state";
 import { cleanupAllPills, notify } from "./ui/notifications";
 import { cleanupQuestButtonObserver, setupQuestButtonObserver } from "./ui/questButtons";
-import { cancelQuest, checkAndResumeQuests } from "./quests/manager";
-import { startStallWatchdog, stopStallWatchdog } from "./core/watchdog";
+import { cancelQuest, checkAndResumeQuests, startQuest } from "./quests/manager";
+import { DEFAULT_STALL_TIMEOUT_MS, startStallWatchdog, stopStallWatchdog } from "./core/watchdog";
 import { settings } from "./settings";
 
 let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
@@ -118,7 +118,20 @@ export default definePlugin({
                     },
                     30 * 60 * 1000
                 );
-                startStallWatchdog();
+                startStallWatchdog(DEFAULT_STALL_TIMEOUT_MS, {
+                    shouldAutoRestart: () => settings.store.autoRestartStalled === true,
+                    onRestart: (questId: string) => {
+                        const data = [...activeQuests.values()].find((d) => d.questId === questId);
+                        if (!data || !data.isProcessing) return;
+                        const userId = data.userId;
+                        cancelQuest(questId, userId);
+                        setTimeout(() => {
+                            startQuest(questId).catch((err) => {
+                                console.warn(`${LOG_PREFIX} Stall restart failed:`, err);
+                            });
+                        }, 1000);
+                    },
+                });
             } else {
                 notify(
                     "Initialization Failed",

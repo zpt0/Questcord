@@ -7,7 +7,21 @@ import { notify } from "../ui/notifications";
 export const STALL_CHECK_INTERVAL_MS = 60_000;
 export const DEFAULT_STALL_TIMEOUT_MS = 10 * 60_000;
 
+// Internal fixed limit: at most one automatic restart per quest.
+// The on/off toggle lives in settings (default off); the cap itself is not configurable.
+export const MAX_STALL_RESTARTS = 1;
+
 let watchdogInterval: ReturnType<typeof setInterval> | null = null;
+const restartCounts = new Map<string, number>();
+
+export interface StallWatchdogOptions {
+    shouldAutoRestart?: () => boolean;
+    onRestart?: (questId: string) => void;
+}
+
+export function resetStallRestartCounts(): void {
+    restartCounts.clear();
+}
 
 export interface StallCheckResult {
     questId: string;
@@ -40,13 +54,44 @@ export function findStalledQuests(
     return stalled;
 }
 
-export function checkStallsOnce(stallTimeoutMs: number = DEFAULT_STALL_TIMEOUT_MS): number {
+export function checkStallsOnce(
+    stallTimeoutMs: number = DEFAULT_STALL_TIMEOUT_MS,
+    options: StallWatchdogOptions = {}
+): number {
     const stalled = findStalledQuests(Date.now(), stallTimeoutMs);
     for (const { questId, stalledForMs } of stalled) {
         const data = [...activeQuests.values()].find((d) => d.questId === questId);
         if (data) data.stallWarned = true;
         const mins = Math.max(1, Math.round(stalledForMs / 60_000));
         const name = getQuestName({ id: questId } as any, "Quest");
+        const restarts = restartCounts.get(questId) ?? 0;
+        if (
+            options.shouldAutoRestart?.() === true &&
+            options.onRestart &&
+            restarts < MAX_STALL_RESTARTS
+        ) {
+            restartCounts.set(questId, restarts + 1);
+            debugLog(
+                `${LOG_PREFIX} Stall detected for quest ${questId} (${mins}m without progress) — restarting`
+            );
+            notify(
+                "Restarting Quest",
+                `${name}: no progress for ~${mins}m. Restarting automation…`,
+                "info",
+                questId
+            );
+            try {
+                const result = options.onRestart(questId) as unknown;
+                if (result instanceof Promise) {
+                    result.catch((e) => {
+                        console.warn(`${LOG_PREFIX} Stall restart failed:`, e);
+                    });
+                }
+            } catch (e) {
+                console.warn(`${LOG_PREFIX} Stall restart failed:`, e);
+            }
+            continue;
+        }
         debugLog(`${LOG_PREFIX} Stall detected for quest ${questId} (${mins}m without progress)`);
         notify(
             "Quest Stalled?",
@@ -58,11 +103,14 @@ export function checkStallsOnce(stallTimeoutMs: number = DEFAULT_STALL_TIMEOUT_M
     return stalled.length;
 }
 
-export function startStallWatchdog(stallTimeoutMs: number = DEFAULT_STALL_TIMEOUT_MS): void {
+export function startStallWatchdog(
+    stallTimeoutMs: number = DEFAULT_STALL_TIMEOUT_MS,
+    options: StallWatchdogOptions = {}
+): void {
     stopStallWatchdog();
     watchdogInterval = setInterval(() => {
         try {
-            checkStallsOnce(stallTimeoutMs);
+            checkStallsOnce(stallTimeoutMs, options);
         } catch (e) {
             console.warn(`${LOG_PREFIX} Stall watchdog error:`, e);
         }
