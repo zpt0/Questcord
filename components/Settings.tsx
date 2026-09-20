@@ -4,6 +4,8 @@ import { Forms, Select, Slider } from "@webpack/common";
 import { settings } from "../settings";
 import { VersionDisplay } from "./VersionDisplay";
 import { ColorPicker } from "./ColorPicker";
+import { clearSavedQuestStates } from "../quests/manager";
+import { notify } from "../ui/notifications";
 
 const cl = classNameFactory("vc-questcord-settings-");
 
@@ -231,6 +233,19 @@ export function QuestSettings() {
                         }}
                     >
                         Reset All Settings
+                    </button>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button
+                        className={cl("check-update-btn")}
+                        style={{ flex: 1 }}
+                        onClick={() => {
+                            clearSavedQuestStates().then(() => {
+                                notify("Cleared", "Saved quest resume states cleared", "info");
+                            });
+                        }}
+                    >
+                        Clear Saved Quests
                     </button>
                 </div>
             </Forms.FormSection>
