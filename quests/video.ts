@@ -9,6 +9,11 @@ import { cleanupQuest } from "./manager";
 import { initializeQuestProgressBar } from "./questProgress";
 
 const MAX_VIDEO_ITERATIONS = 3600;
+// Internal budgets (not user-configurable): each progress post is retried a
+// few times, and only sustained failures abort the quest.
+const VIDEO_POST_ATTEMPTS = 3;
+const VIDEO_POST_RETRY_BASE_MS = 2000;
+const MAX_CONSECUTIVE_VIDEO_ERRORS = 10;
 
 export async function completeVideoQuest(quest: Quest, userId: string): Promise<boolean> {
     const taskConfig = getTaskConfig(quest);
@@ -53,20 +58,35 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
                 modules.find((x: any) => x?.exports?.HTTP?.get)?.exports?.HTTP;
         }
         const postProgress = async (timestamp: number) => {
-            if (apiModule) {
-                const res = await apiModule.post({
-                    url: `/quests/${quest.id}/video-progress`,
-                    body: { timestamp },
-                });
-                return res.body?.completed_at != null;
-            } else {
-                const res = await rateLimitedPost(`/quests/${quest.id}/video-progress`, {
-                    timestamp,
-                });
-                return res?.completed_at != null;
+            let lastError: unknown = new Error("Video progress post failed");
+            for (let attempt = 0; attempt < VIDEO_POST_ATTEMPTS; attempt++) {
+                try {
+                    if (apiModule) {
+                        const res = await apiModule.post({
+                            url: `/quests/${quest.id}/video-progress`,
+                            body: { timestamp },
+                        });
+                        return res.body?.completed_at != null;
+                    } else {
+                        const res = await rateLimitedPost(`/quests/${quest.id}/video-progress`, {
+                            timestamp,
+                        });
+                        return res?.completed_at != null;
+                    }
+                } catch (e) {
+                    lastError = e;
+                    if (attempt < VIDEO_POST_ATTEMPTS - 1) {
+                        const backoffMs =
+                            VIDEO_POST_RETRY_BASE_MS * (attempt + 1) +
+                            Math.floor(Math.random() * 500);
+                        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+                    }
+                }
             }
+            throw lastError;
         };
         let iterations = 0;
+        let consecutiveErrors = 0;
         while (iterations++ < MAX_VIDEO_ITERATIONS) {
             const questData = activeQuests.get(key);
             if (!questData || !questData.isProcessing || isPluginStopping) {
@@ -81,12 +101,27 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
                     completed = await postProgress(
                         Math.min(secondsNeeded, timestamp + Math.random())
                     );
+                    consecutiveErrors = 0;
                     secondsDone = Math.min(secondsNeeded, timestamp);
                     const percent = Math.min(100, (secondsDone / secondsNeeded) * 100);
                     updateProgressBar(quest.id, userId, percent);
                     debugLog(`${LOG_PREFIX} Video progress: ${secondsDone}/${secondsNeeded}`);
                 } catch (e) {
-                    console.warn(`${LOG_PREFIX} Video progress error:`, e);
+                    consecutiveErrors++;
+                    console.warn(
+                        `${LOG_PREFIX} Video progress error (${consecutiveErrors}/${MAX_CONSECUTIVE_VIDEO_ERRORS}):`,
+                        e
+                    );
+                    if (consecutiveErrors >= MAX_CONSECUTIVE_VIDEO_ERRORS) {
+                        notify(
+                            "Quest Error",
+                            "Video progress keeps failing. Your progress was likely saved - try again later.",
+                            "error",
+                            quest.id
+                        );
+                        cleanupQuest(quest.id, userId);
+                        return false;
+                    }
                 }
             }
             if (timestamp >= secondsNeeded) break;
