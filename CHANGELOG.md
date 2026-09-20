@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.2]
+
+- Dev dependency updates: vitest 5.0.1, @vitest/coverage-v8 5.0.1, typescript-eslint 8.70.0, @types/node 26.6.2, @types/react 19.3.0 (pinned via npm override for the exact peer requirement in @vencord/discord-types)
+- No functional changes
+
 ## [1.1.1]
 
 - Fix duplicated version/update block in plugin settings (removed redundant `versionInfo` component setting, the custom settings panel already shows it)
