@@ -42,4 +42,8 @@ describe("constants", () => {
         expect(typeof SUPPORT_INVITE_CODE).toBe("string");
         expect(SUPPORT_INVITE_CODE).toBe("9ra6MwHTHy");
     });
+
+    it("points updates at the current updates channel", () => {
+        expect(UPDATES_CHANNEL_ID).toBe("1532348047697121340");
+    });
 });
