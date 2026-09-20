@@ -11,7 +11,7 @@ import {
 } from "../core/state";
 import { suppressConsole, restoreConsole } from "../core/utils";
 import { QuestsStore } from "../core/stores";
-import { discordApiPost, discordApiGet } from "../core/api";
+import { discordApiGet, rateLimitedPost } from "../core/api";
 import {
     ALL_TASK_TYPES,
     SavedQuestState,
@@ -183,7 +183,7 @@ export async function startQuest(questId: string) {
         if (!quest.userStatus?.enrolledAt) {
             try {
                 notify("Enrolling...", "Accepting quest automatically...", "info");
-                await discordApiPost(`/quests/${questId}/enroll`, { location: 2 });
+                await rateLimitedPost(`/quests/${questId}/enroll`, { location: 2 });
                 await new Promise((r) => setTimeout(r, 1500));
                 const origConsole2 = suppressConsole("log", "warn");
                 try {
