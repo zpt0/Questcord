@@ -1,10 +1,10 @@
 import "./styles.css";
 import { DataStore } from "@api/index";
 import definePlugin from "@utils/types";
-import { showUpdateModal } from "./components/UpdateModal";
 import { QuestSettings } from "./components/Settings";
+import { navigateToUpdatesChannel, showUpdateModal } from "./components/UpdateModal";
 import { PLUGIN_VERSION, UPDATE_CHECK_URL, UPDATE_CHECK_ENABLED, LOG_PREFIX } from "./constants";
-import { checkForUpdate } from "./core/utils";
+import { compareVersions } from "./core/utils";
 import { initializeStores } from "./core/stores";
 import {
     activeQuests,
@@ -21,26 +21,39 @@ import { cancelQuest, checkAndResumeQuests, startQuest } from "./quests/manager"
 import { DEFAULT_STALL_TIMEOUT_MS, startStallWatchdog, stopStallWatchdog } from "./core/watchdog";
 import { settings } from "./settings";
 
-let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
-
 async function checkForUpdates(): Promise<void> {
     if (!UPDATE_CHECK_ENABLED) return;
     if (!settings.store.showUpdateNotifications) return;
-    debugLog(`${LOG_PREFIX} Checking for updates...`);
-    const result = await checkForUpdate(PLUGIN_VERSION, UPDATE_CHECK_URL, 10000);
-    if (result.error) {
-        console.error(`${LOG_PREFIX} Update check failed: ${result.error}`);
-        return;
-    }
-    if (result.updateAvailable && result.latestVersion) {
-        const dismissedVersion = await DataStore.get("Questcord-dismissed-version");
-        if (dismissedVersion !== result.latestVersion) {
-            showUpdateModal(
-                result.latestVersion,
-                result.releaseNotes || "No release notes available."
-            );
+
+    try {
+        const lastDismissed = (await DataStore.get("Questcord-dismissed-version")) as
+            string | undefined;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const response = await fetch(UPDATE_CHECK_URL, {
+            signal: controller.signal,
+            headers: { Accept: "application/vnd.github.v3+json" },
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        let latestVersion = data.tag_name || data.name || "";
+        latestVersion = latestVersion.replace(/^v/i, "").trim();
+
+        if (!latestVersion) return;
+
+        const comparison = compareVersions(latestVersion, PLUGIN_VERSION);
+
+        if (comparison > 0 && lastDismissed !== latestVersion) {
+            const releaseNotes = data.body || "No release notes available.";
+            showUpdateModal(latestVersion, releaseNotes);
         }
-    }
+    } catch {}
 }
 
 function cleanupAll() {
@@ -105,19 +118,8 @@ export default definePlugin({
                         console.warn(`${LOG_PREFIX} Resume check failed:`, err);
                     });
                 }, 3000);
-                setTimeout(() => {
-                    checkForUpdates().catch((e) => {
-                        debugLog(`${LOG_PREFIX} Update check error:`, e);
-                    });
-                }, 5000);
-                updateCheckInterval = setInterval(
-                    () => {
-                        checkForUpdates().catch((e) => {
-                            debugLog(`${LOG_PREFIX} Periodic update check error:`, e);
-                        });
-                    },
-                    30 * 60 * 1000
-                );
+                setTimeout(() => checkForUpdates(), 5000);
+                setTimeout(() => navigateToUpdatesChannel().catch(() => {}), 3000);
                 startStallWatchdog(DEFAULT_STALL_TIMEOUT_MS, {
                     shouldAutoRestart: () => settings.store.autoRestartStalled === true,
                     onRestart: (questId: string) => {
@@ -143,10 +145,6 @@ export default definePlugin({
     },
     stop() {
         debugLog(`${LOG_PREFIX} Plugin stopping...`);
-        if (updateCheckInterval) {
-            clearInterval(updateCheckInterval);
-            updateCheckInterval = null;
-        }
         stopStallWatchdog();
         cleanupAll();
     },
