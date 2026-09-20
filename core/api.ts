@@ -20,22 +20,111 @@ interface ApiError extends Error {
     retryAfter?: number;
 }
 
-export async function discordApiGet(endpoint: string): Promise<any> {
+// ── Retry policy (internal, fixed limits — no user settings) ──
+const MAX_RETRIES = 5;
+const BASE_DELAY_MS = 2000;
+const MAX_RATE_LIMIT_DELAY_MS = 15000;
+const MAX_ERROR_DELAY_MS = 10000;
+const JITTER_MS = 500;
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((r) => setTimeout(r, ms));
+}
+
+function computeBackoffDelay(attempt: number, capMs: number): number {
+    const backoff = Math.min(BASE_DELAY_MS * (attempt + 1), capMs);
+    return backoff + Math.floor(Math.random() * JITTER_MS);
+}
+
+function parseRetryAfterMs(response: Response): number | null {
+    const header = response.headers.get("retry-after");
+    if (!header) return null;
+    const seconds = parseFloat(header);
+    if (isNaN(seconds) || seconds < 0) return null;
+    return seconds * 1000;
+}
+
+function getErrorStatus(error: any): number | undefined {
+    return error?.status ?? error?.response?.status;
+}
+
+function isRateLimitError(error: any): boolean {
+    return (
+        getErrorStatus(error) === 429 ||
+        (typeof error?.message === "string" && error.message.includes("rate limit"))
+    );
+}
+
+interface RetryDecision {
+    shouldRetry: boolean;
+    waitMs: number;
+    reason: string;
+}
+
+function decideRetry(error: any, attempt: number, maxRetries: number): RetryDecision {
+    const status = getErrorStatus(error);
+    // 4xx (except 429) and auth errors are never retried
+    if (status != null && status < 500 && status !== 429) {
+        return { shouldRetry: false, waitMs: 0, reason: "" };
+    }
+    if (attempt >= maxRetries - 1) {
+        return { shouldRetry: false, waitMs: 0, reason: "" };
+    }
+    if (isRateLimitError(error)) {
+        return {
+            shouldRetry: true,
+            waitMs: error?.retryAfter ?? computeBackoffDelay(attempt, MAX_RATE_LIMIT_DELAY_MS),
+            reason: "Rate limited",
+        };
+    }
+    if (status == null) {
+        return {
+            shouldRetry: true,
+            waitMs: computeBackoffDelay(attempt, MAX_ERROR_DELAY_MS),
+            reason: "Network error",
+        };
+    }
+    return {
+        shouldRetry: true,
+        waitMs: computeBackoffDelay(attempt, MAX_ERROR_DELAY_MS),
+        reason: `Server error ${status}`,
+    };
+}
+
+export async function discordApiGet(endpoint: string, maxRetries = MAX_RETRIES): Promise<any> {
     const token = getDiscordToken();
     if (!token) throw new Error("No Discord token available");
-    const response = await fetch(`/api/v9${endpoint}`, {
-        method: "GET",
-        headers: {
-            Authorization: token,
-            "Content-Type": "application/json",
-        },
-    });
-    if (!response.ok) {
-        const error: ApiError = new Error(`API GET failed: ${response.status}`);
-        error.status = response.status;
-        throw error;
+    let lastError: any = new Error("Max retries exceeded");
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const response = await fetch(`/api/v9${endpoint}`, {
+                method: "GET",
+                headers: {
+                    Authorization: token,
+                    "Content-Type": "application/json",
+                },
+            });
+            if (!response.ok) {
+                const error: ApiError = new Error(`API GET failed: ${response.status}`);
+                error.status = response.status;
+                if (response.status === 429) {
+                    const retryAfter = parseRetryAfterMs(response);
+                    if (retryAfter != null) error.retryAfter = retryAfter;
+                }
+                throw error;
+            }
+            return response.json();
+        } catch (error: any) {
+            lastError = error;
+            const { shouldRetry, waitMs, reason } = decideRetry(error, attempt, maxRetries);
+            if (!shouldRetry) throw error;
+            console.warn(
+                `${LOG_PREFIX} ${reason}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries}): ${error?.message}`
+            );
+            await sleep(waitMs);
+        }
     }
-    return response.json();
+    throw lastError;
 }
 
 export async function discordApiPost(endpoint: string, body: any): Promise<any> {
@@ -61,10 +150,8 @@ export async function discordApiPost(endpoint: string, body: any): Promise<any> 
         error.status = response.status;
         error.body = errorBody;
         if (response.status === 429) {
-            const retryAfterHeader = response.headers.get("retry-after");
-            if (retryAfterHeader) {
-                error.retryAfter = parseFloat(retryAfterHeader) * 1000;
-            }
+            const retryAfter = parseRetryAfterMs(response);
+            if (retryAfter != null) error.retryAfter = retryAfter;
         }
         throw error;
     }
@@ -72,38 +159,24 @@ export async function discordApiPost(endpoint: string, body: any): Promise<any> 
     return text ? JSON.parse(text) : {};
 }
 
-export async function rateLimitedPost(endpoint: string, body: any, maxRetries = 5): Promise<any> {
+export async function rateLimitedPost(
+    endpoint: string,
+    body: any,
+    maxRetries = MAX_RETRIES
+): Promise<any> {
+    let lastError: any = new Error("Max retries exceeded");
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             return await discordApiPost(endpoint, body);
         } catch (error: any) {
-            const status = error?.status || error?.response?.status;
-            if (status === 429 || (error?.message && error.message.includes("rate limit"))) {
-                const waitTime = error.retryAfter || Math.min(2000 * (attempt + 1), 15000);
-                console.warn(
-                    `${LOG_PREFIX} Rate limited, retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`
-                );
-                await new Promise((r) => setTimeout(r, waitTime));
-                continue;
-            }
-            if (!status && attempt < maxRetries - 1) {
-                const waitTime = Math.min(2000 * (attempt + 1), 10000);
-                console.warn(
-                    `${LOG_PREFIX} Network error, retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries}): ${error?.message}`
-                );
-                await new Promise((r) => setTimeout(r, waitTime));
-                continue;
-            }
-            if (status >= 500 && attempt < maxRetries - 1) {
-                const waitTime = Math.min(2000 * (attempt + 1), 10000);
-                console.warn(
-                    `${LOG_PREFIX} Server error ${status}, retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`
-                );
-                await new Promise((r) => setTimeout(r, waitTime));
-                continue;
-            }
-            throw error;
+            lastError = error;
+            const { shouldRetry, waitMs, reason } = decideRetry(error, attempt, maxRetries);
+            if (!shouldRetry) throw error;
+            console.warn(
+                `${LOG_PREFIX} ${reason}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries}): ${error?.message}`
+            );
+            await sleep(waitMs);
         }
     }
-    throw new Error("Max retries exceeded");
+    throw lastError;
 }
