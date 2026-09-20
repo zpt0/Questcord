@@ -31,6 +31,11 @@ export interface DesktopQuestConfig {
     getProgressFromHeartbeat: (data: any, lastFallback: number) => number;
 }
 
+// Internal budgets (not user-configurable).
+const DESKTOP_MODULE_LOOKUP_ATTEMPTS = 3;
+const DESKTOP_MODULE_LOOKUP_RETRY_MS = 2000;
+const DESKTOP_MAX_RUNTIME_BUFFER_MS = 15 * 60 * 1000;
+
 export async function completeDesktopQuest(
     quest: Quest,
     userId: string,
@@ -70,15 +75,28 @@ export async function completeDesktopQuest(
     return new Promise<boolean>((resolve) => {
         (async () => {
             try {
-                const modules = getWebpackModules();
+                let modules: any[] | null = null;
+                let storeLocal: any = null;
+                let FluxDispatcherLocal: any = null;
+                for (let attempt = 0; attempt < DESKTOP_MODULE_LOOKUP_ATTEMPTS; attempt++) {
+                    modules = getWebpackModules();
+                    if (modules && modules.length > 0) {
+                        storeLocal = config.getStoreModule(modules);
+                        FluxDispatcherLocal = findFluxDispatcher();
+                    }
+                    if (storeLocal && FluxDispatcherLocal) break;
+                    if (attempt < DESKTOP_MODULE_LOOKUP_ATTEMPTS - 1) {
+                        debugLog(
+                            `${LOG_PREFIX} ${config.questType} store lookup failed (attempt ${attempt + 1}/${DESKTOP_MODULE_LOOKUP_ATTEMPTS}), retrying…`
+                        );
+                        await new Promise((r) => setTimeout(r, DESKTOP_MODULE_LOOKUP_RETRY_MS));
+                    }
+                }
                 if (!modules || modules.length === 0) {
                     notify("Error", "Webpack not available", "error", quest.id);
                     resolve(false);
                     return;
                 }
-                const storeLocal = config.getStoreModule(modules);
-                const FluxDispatcherLocal = findFluxDispatcher();
-
                 if (!storeLocal) {
                     notify("Error", `${config.questType} store not found`, "error", quest.id);
                     resolve(false);
@@ -97,12 +115,40 @@ export async function completeDesktopQuest(
 
                 let lastServerProgress = currentProgress;
                 const startTime = Date.now();
+                const maxRuntimeMs = secondsNeeded * 1000 + DESKTOP_MAX_RUNTIME_BUFFER_MS;
 
                 const updateTicker = setInterval(() => {
                     try {
                         const questData = activeQuests.get(key);
                         if (!questData || !questData.isProcessing || isPluginStopping) {
                             clearInterval(updateTicker);
+                            return;
+                        }
+
+                        if (Date.now() - startTime > maxRuntimeMs) {
+                            clearInterval(updateTicker);
+                            debugLog(
+                                `${LOG_PREFIX} ${config.questType} quest timed out after ${Math.round(maxRuntimeMs / 60000)}m`
+                            );
+                            try {
+                                config.restoreStore(storeLocal, realFunc);
+                                FluxDispatcherLocal.unsubscribe(
+                                    "QUESTS_SEND_HEARTBEAT_SUCCESS",
+                                    heartbeatHandler
+                                );
+                            } catch (e) {
+                                debugLog(`${LOG_PREFIX} Timeout cleanup error:`, e);
+                            }
+                            const timedOutName = getQuestName(quest, config.defaultQuestName);
+                            notify(
+                                "Quest Timeout",
+                                `${timedOutName} made no server progress in time. Try again later.`,
+                                "error",
+                                quest.id
+                            );
+                            removeProgressBar(quest.id, userId);
+                            cleanupQuest(quest.id, userId);
+                            resolve(false);
                             return;
                         }
 
