@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { activeQuests } from "../state";
-import { findStalledQuests, checkStallsOnce, DEFAULT_STALL_TIMEOUT_MS } from "../watchdog";
+import {
+    findStalledQuests,
+    checkStallsOnce,
+    resetStallRestartCounts,
+    DEFAULT_STALL_TIMEOUT_MS,
+} from "../watchdog";
 import { QuestData } from "../types";
 
 vi.mock("../stores", () => ({
@@ -91,5 +96,40 @@ describe("findStalledQuests", () => {
         expect(checkStallsOnce()).toBe(1);
         expect(notify).toHaveBeenCalledOnce();
         expect(findStalledQuests()).toHaveLength(0);
+    });
+
+    it("restarts stalled quest once when enabled, then only notifies", () => {
+        resetStallRestartCounts();
+        const quest = addQuest({
+            lastProgressAt: Date.now() - DEFAULT_STALL_TIMEOUT_MS - 1000,
+        });
+        (QuestsStore.getQuest as any).mockReturnValue({ userStatus: {} });
+        const onRestart = vi.fn();
+        const options = { shouldAutoRestart: () => true, onRestart };
+        expect(checkStallsOnce(DEFAULT_STALL_TIMEOUT_MS, options)).toBe(1);
+        expect(onRestart).toHaveBeenCalledTimes(1);
+        expect(onRestart).toHaveBeenCalledWith("q1");
+        expect(notify).toHaveBeenCalledWith("Restarting Quest", expect.any(String), "info", "q1");
+        // Simulate a fresh entry after the restart stalling again: no second restart.
+        quest.stallWarned = false;
+        quest.lastProgressAt = Date.now() - DEFAULT_STALL_TIMEOUT_MS - 1000;
+        expect(checkStallsOnce(DEFAULT_STALL_TIMEOUT_MS, options)).toBe(1);
+        expect(onRestart).toHaveBeenCalledTimes(1);
+        expect(notify).toHaveBeenCalledWith("Quest Stalled?", expect.any(String), "error", "q1");
+    });
+
+    it("only notifies when auto-restart is disabled", () => {
+        resetStallRestartCounts();
+        addQuest({ lastProgressAt: Date.now() - DEFAULT_STALL_TIMEOUT_MS - 1000 });
+        (QuestsStore.getQuest as any).mockReturnValue({ userStatus: {} });
+        const onRestart = vi.fn();
+        expect(
+            checkStallsOnce(DEFAULT_STALL_TIMEOUT_MS, {
+                shouldAutoRestart: () => false,
+                onRestart,
+            })
+        ).toBe(1);
+        expect(onRestart).not.toHaveBeenCalled();
+        expect(notify).toHaveBeenCalledWith("Quest Stalled?", expect.any(String), "error", "q1");
     });
 });
