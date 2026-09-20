@@ -1,100 +1,220 @@
-import { PLUGIN_VERSION, UPDATES_CHANNEL_ID, SUPPORT_INVITE_CODE } from "../constants";
-import { ChannelStore, NavigationRouter } from "@webpack/common";
 import { DataStore } from "@api/index";
-import { getThemeVariables } from "../core/utils";
-import { applyPillContainerStyle } from "../ui/pillStyles";
+import {
+    openModal,
+    ModalProps,
+    ModalRoot,
+    ModalHeader,
+    ModalContent,
+    ModalFooter,
+} from "@utils/modal";
+import { Button, ChannelStore, NavigationRouter, InviteActions, Parser } from "@webpack/common";
+import { openInviteModal } from "@utils/discord";
+import {
+    GITHUB_RELEASE_URL,
+    PLUGIN_VERSION,
+    UPDATES_CHANNEL_ID,
+    SUPPORT_INVITE_CODE,
+} from "../constants";
 
-export function showUpdateModal(version: string, releaseNotes: string) {
-    if (typeof document !== "undefined" && !document.getElementById("update-pill-styles")) {
-        const style = document.createElement("style");
-        style.id = "update-pill-styles";
-        style.textContent = `
-            @keyframes updatePillEntry {
-                0% { opacity: 0; transform: translateY(-20px); scale: 0.95; }
-                100% { opacity: 1; transform: translateY(0); scale: 1; }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-    let container = document.getElementById("vc-pill-container");
-    if (!container) {
-        container = document.createElement("div");
-        container.id = "vc-pill-container";
-        container.className = "vc-pill-container";
-        document.body.appendChild(container);
-    }
-    applyPillContainerStyle(container);
+const DISMISSED_KEY = "Questcord-dismissed-version";
 
-    const pillRow = document.createElement("div");
-    pillRow.className = "quest-pill-row";
-
-    const pill = document.createElement("div");
-    pill.className = "quest-pill";
-    pill.style.minWidth = "320px";
-    pill.style.animation = "updatePillEntry 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards";
-
-    const isMandatory = releaseNotes.includes("[MANDATORY]");
-    const theme = getThemeVariables();
-
-    const formattedNotes =
-        releaseNotes
-            .replace(/\[MANDATORY\]/gi, "")
-            .replace(/#{1,6}\s/g, "")
-            .replace(/\[([^\]]*)\]\([^)\s]+\)/g, "$1")
-            .replace(/\*\*(.*?)\*\*/g, "$1")
-            .replace(/`(.*?)`/g, "$1")
-            .substring(0, 150) + "...";
-
-    pill.innerHTML = `
-        <div class="quest-pill-compact" style="justify-content: center; position: relative; margin-bottom: 12px; width: 100%;">
-            <span class="quest-pill-title" style="color: ${isMandatory ? theme.dangerColor : theme.successColor}; font-size: 14px; flex: unset;">QuestCord Update</span>
-            <span class="quest-pill-percent" style="position: absolute; right: 0; color: white; background: ${isMandatory ? theme.dangerColor : theme.successColor}; padding: 2px 8px; border-radius: 12px; font-size: 11px; min-width: unset;">v${version}</span>
-        </div>
-        <div class="quest-pill-expanded" style="grid-template-rows: 1fr; opacity: 1; pointer-events: auto;">
-            <div class="quest-pill-expanded-inner">
-                <div class="quest-pill-body" style="text-align: left; line-height: 1.4; margin-bottom: 4px;">
-                    <strong style="color: #fff">Current: v${PLUGIN_VERSION}</strong><br/><br/>
-                    <span style="opacity: 0.8">${formattedNotes}</span>
-                    ${isMandatory ? `<br/><br/><strong style="color: ${theme.dangerColor};">This is a mandatory update.</strong>` : ""}
-                </div>
-                <div class="quest-pill-actions" style="margin-top: 8px;">
-                    ${!isMandatory ? `<button class="quest-btn danger" id="qc-update-dismiss-${version.replace(/\./g, "")}">Not Now</button>` : ""}
-                    <button class="quest-btn success" id="qc-update-now-${version.replace(/\./g, "")}">View Update</button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    pillRow.appendChild(pill);
-    container.insertBefore(pillRow, container.firstChild);
-
-    if (!isMandatory) {
-        pill.querySelector("#qc-update-dismiss-" + version.replace(/\./g, ""))?.addEventListener(
-            "click",
-            () => {
-                DataStore.set("Questcord-dismissed-version", version);
-                pill.style.animation = "none";
-                pill.classList.add("hiding");
-                setTimeout(() => pillRow.remove(), 500);
-            }
-        );
+export function showUpdateModal(latestVersion: string, releaseNotes: string): void {
+    if (!openModal) {
+        console.error("[Questcord] Missing openModal");
+        return;
     }
 
-    pill.querySelector("#qc-update-now-" + version.replace(/\./g, ""))?.addEventListener(
-        "click",
-        () => {
-            const channel = ChannelStore.getChannel(UPDATES_CHANNEL_ID);
-            if (channel && channel.guild_id) {
-                NavigationRouter.transitionTo(
-                    `/channels/${channel.guild_id}/${UPDATES_CHANNEL_ID}`
-                );
-            } else {
-                const { openInviteModal } = require("@utils/discord");
-                openInviteModal(SUPPORT_INVITE_CODE);
-            }
-            pill.style.animation = "none";
-            pill.classList.add("hiding");
-            setTimeout(() => pillRow.remove(), 500);
+    openModal((props: ModalProps) => (
+        <UpdateModalInner props={props} latestVersion={latestVersion} releaseNotes={releaseNotes} />
+    ));
+}
+
+export async function navigateToUpdatesChannel(): Promise<void> {
+    // If we have a channel ID, try to navigate directly
+    if (UPDATES_CHANNEL_ID) {
+        const channel = ChannelStore.getChannel(UPDATES_CHANNEL_ID);
+        if (channel?.guild_id) {
+            NavigationRouter.transitionTo(`/channels/${channel.guild_id}/${UPDATES_CHANNEL_ID}`);
+            return;
         }
+    }
+
+    // Try to resolve the invite code to find the guild
+    if (SUPPORT_INVITE_CODE) {
+        try {
+            const { invite } = await InviteActions.resolveInvite(
+                SUPPORT_INVITE_CODE,
+                "Desktop Modal"
+            );
+            if (invite?.guild?.id) {
+                const channelId = UPDATES_CHANNEL_ID || "";
+                NavigationRouter.transitionTo(`/channels/${invite.guild.id}/${channelId}`);
+                return;
+            }
+        } catch (e) {
+            console.warn("[Questcord] Failed to resolve invite:", e);
+        }
+
+        // Fallback: open invite modal
+        openInviteModal(SUPPORT_INVITE_CODE);
+    }
+}
+
+function UpdateModalInner({
+    props,
+    latestVersion,
+    releaseNotes,
+}: {
+    props: ModalProps;
+    latestVersion: string;
+    releaseNotes: string;
+}) {
+    const handleDismiss = async () => {
+        await DataStore.set(DISMISSED_KEY, latestVersion);
+        props.onClose();
+    };
+
+    const handleUpdate = async () => {
+        await DataStore.set(DISMISSED_KEY, latestVersion);
+        window.open(GITHUB_RELEASE_URL, "_blank");
+        props.onClose();
+    };
+
+    const handleDiscord = async () => {
+        await DataStore.set(DISMISSED_KEY, latestVersion);
+        await navigateToUpdatesChannel();
+        props.onClose();
+    };
+
+    const whiteText = { color: "#FFFFFF", fontWeight: 600 };
+
+    return (
+        <ModalRoot {...props}>
+            <ModalHeader>
+                <span style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF" }}>
+                    🚀 Update Available
+                </span>
+            </ModalHeader>
+            <ModalContent>
+                <div style={{ padding: "12px 0" }}>
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginBottom: 16,
+                            backgroundColor: "var(--background-secondary)",
+                            padding: "16px",
+                            borderRadius: "8px",
+                            gap: "24px",
+                        }}
+                    >
+                        <div style={{ textAlign: "center" }}>
+                            <div
+                                style={{
+                                    fontSize: "11px",
+                                    fontWeight: 700,
+                                    color: "#FFFFFF",
+                                    opacity: 0.7,
+                                    textTransform: "uppercase",
+                                    marginBottom: "4px",
+                                }}
+                            >
+                                Current
+                            </div>
+                            <div style={{ fontSize: "18px", fontWeight: 700, color: "#FFFFFF" }}>
+                                v{PLUGIN_VERSION}
+                            </div>
+                        </div>
+                        <div
+                            style={{
+                                fontSize: "18px",
+                                fontWeight: 700,
+                                color: "#FFFFFF",
+                                opacity: 0.5,
+                            }}
+                        >
+                            →
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                            <div
+                                style={{
+                                    fontSize: "11px",
+                                    fontWeight: 700,
+                                    color: "#FFFFFF",
+                                    opacity: 0.7,
+                                    textTransform: "uppercase",
+                                    marginBottom: "4px",
+                                }}
+                            >
+                                New
+                            </div>
+                            <div style={{ fontSize: "18px", fontWeight: 700, color: "#2dc770" }}>
+                                v{latestVersion}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        style={{
+                            backgroundColor: "var(--background-secondary)",
+                            borderRadius: 8,
+                            padding: 12,
+                            border: "1px solid var(--background-modifier-accent)",
+                        }}
+                    >
+                        <div
+                            style={{
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                color: "#FFFFFF",
+                                opacity: 0.7,
+                                marginBottom: 8,
+                                textTransform: "uppercase",
+                            }}
+                        >
+                            What's New in v{latestVersion}
+                        </div>
+                        <div
+                            style={{
+                                color: "#FFFFFF",
+                                lineHeight: "1.5",
+                                fontSize: "14px",
+                            }}
+                        >
+                            {Parser.parse(releaseNotes, true)}
+                        </div>
+                    </div>
+                </div>
+            </ModalContent>
+            <ModalFooter>
+                <div
+                    style={{
+                        display: "flex",
+                        gap: "12px",
+                        width: "100%",
+                        alignItems: "center",
+                    }}
+                >
+                    <Button
+                        color={Button.Colors.PRIMARY}
+                        onClick={handleDismiss}
+                        style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.1)" }}
+                    >
+                        <span style={whiteText}>Not Now</span>
+                    </Button>
+                    <Button
+                        color={Button.Colors.PRIMARY}
+                        onClick={handleDiscord}
+                        style={{ flex: 1, backgroundColor: "rgba(88,101,242,0.3)" }}
+                    >
+                        <span style={whiteText}>💬 Discord</span>
+                    </Button>
+                    <Button color={Button.Colors.GREEN} onClick={handleUpdate} style={{ flex: 1 }}>
+                        <span style={whiteText}>Update Now</span>
+                    </Button>
+                </div>
+            </ModalFooter>
+        </ModalRoot>
     );
 }
