@@ -1,6 +1,5 @@
 import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
-import { VersionDisplay } from "./components/VersionDisplay";
 
 export const settings = definePluginSettings({
     // ── Notifications (visible in Vencord settings) ──
@@ -51,11 +50,6 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Show notifications when a new version is available",
         default: true,
-    },
-    versionInfo: {
-        type: OptionType.COMPONENT,
-        description: "",
-        component: VersionDisplay,
     },
 
     // ── Pill Position (custom UI only) ──
