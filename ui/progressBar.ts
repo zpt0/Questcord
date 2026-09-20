@@ -55,10 +55,9 @@ export function createProgressBar(questId: string, userId: string): HTMLElement 
 
 export function updateProgressBar(questId: string, userId: string, percent: number) {
     if (isPluginStopping) return;
-    if (!settings.store.showProgressBar) return;
     const key = getProgressBarKey(questId, userId);
     const clampedPercent = Math.min(100, Math.max(0, percent));
-    updateQuestPill(questId, undefined, clampedPercent);
+    // Always track progress for the stall watchdog, even when the visible bar is disabled.
     const questData = activeQuests.get(key);
     if (questData) {
         if (clampedPercent > questData.lastProgress) {
@@ -67,6 +66,8 @@ export function updateProgressBar(questId: string, userId: string, percent: numb
         }
         questData.lastProgress = clampedPercent;
     }
+    if (!settings.store.showProgressBar) return;
+    updateQuestPill(questId, undefined, clampedPercent);
 }
 
 export function removeProgressBar(questId: string, userId: string) {
