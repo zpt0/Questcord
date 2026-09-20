@@ -1,6 +1,6 @@
 import { rateLimitedPost } from "../core/api";
 import { LOG_PREFIX } from "../constants";
-import { activeQuests, getProgressBarKey, isPluginStopping } from "../core/state";
+import { activeQuests, debugLog, getProgressBarKey, isPluginStopping } from "../core/state";
 import { ChannelStore, GuildChannelStore } from "../core/stores";
 import { Quest, getTaskConfig, getQuestName } from "../core/types";
 import { safeTimeout } from "../core/utils";
@@ -10,6 +10,12 @@ import { cleanupQuest } from "./manager";
 import { initializeQuestProgressBar } from "./questProgress";
 
 const MAX_ACTIVITY_ITERATIONS = 3600;
+// Internal budgets (not user-configurable): tolerate transient heartbeat
+// failures with backoff instead of aborting on the first error.
+const MAX_CONSECUTIVE_HEARTBEAT_ERRORS = 5;
+const HEARTBEAT_RETRY_BASE_DELAY_MS = 2000;
+const TERMINAL_HEARTBEAT_ATTEMPTS = 3;
+const TERMINAL_HEARTBEAT_RETRY_DELAY_MS = 2000;
 
 export async function completeActivityQuest(quest: Quest, userId: string): Promise<boolean> {
     const taskConfig = getTaskConfig(quest);
@@ -48,6 +54,7 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
         const minInterval = 0.8;
         const maxInterval = 1.5;
         let iterations = 0;
+        let consecutiveErrors = 0;
         while (iterations++ < MAX_ACTIVITY_ITERATIONS) {
             const questData = activeQuests.get(key);
             if (!questData || !questData.isProcessing || isPluginStopping) {
@@ -59,6 +66,7 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
                     stream_key: streamKey,
                     terminal: false,
                 });
+                consecutiveErrors = 0;
                 const progress = res?.progress?.[taskName]?.value ?? 0;
                 const percent =
                     targetNeeded > 0
@@ -66,24 +74,45 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
                         : 0;
                 updateProgressBar(quest.id, userId, percent);
                 if (progress >= targetNeeded) {
-                    try {
-                        await rateLimitedPost(`/quests/${quest.id}/heartbeat`, {
-                            stream_key: streamKey,
-                            terminal: true,
-                        });
-                    } catch (e) {
-                        console.warn(
-                            `${LOG_PREFIX} Terminal heartbeat failed (quest may still be complete):`,
-                            e
-                        );
+                    for (let attempt = 0; attempt < TERMINAL_HEARTBEAT_ATTEMPTS; attempt++) {
+                        try {
+                            await rateLimitedPost(`/quests/${quest.id}/heartbeat`, {
+                                stream_key: streamKey,
+                                terminal: true,
+                            });
+                            break;
+                        } catch (e) {
+                            if (attempt >= TERMINAL_HEARTBEAT_ATTEMPTS - 1) {
+                                console.warn(
+                                    `${LOG_PREFIX} Terminal heartbeat failed (quest may still be complete):`,
+                                    e
+                                );
+                            } else {
+                                await new Promise((resolve) =>
+                                    setTimeout(resolve, TERMINAL_HEARTBEAT_RETRY_DELAY_MS)
+                                );
+                            }
+                        }
                     }
                     break;
                 }
-            } catch {
-                notify("Quest Error", "Failed to complete activity", "error", quest.id);
-                removeProgressBar(quest.id, userId);
-                cleanupQuest(quest.id, userId);
-                return false;
+            } catch (e) {
+                consecutiveErrors++;
+                if (consecutiveErrors >= MAX_CONSECUTIVE_HEARTBEAT_ERRORS) {
+                    notify("Quest Error", "Failed to complete activity", "error", quest.id);
+                    removeProgressBar(quest.id, userId);
+                    cleanupQuest(quest.id, userId);
+                    return false;
+                }
+                debugLog(
+                    `${LOG_PREFIX} Activity heartbeat failed (${consecutiveErrors}/${MAX_CONSECUTIVE_HEARTBEAT_ERRORS}), retrying…`,
+                    e
+                );
+                const backoffMs =
+                    HEARTBEAT_RETRY_BASE_DELAY_MS * consecutiveErrors +
+                    Math.floor(Math.random() * 500);
+                await new Promise((resolve) => setTimeout(resolve, backoffMs));
+                continue;
             }
             const dynamicInterval = minInterval + Math.random() * (maxInterval - minInterval);
             await new Promise((resolve) =>
