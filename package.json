@@ -1,6 +1,6 @@
 {
     "name": "questcord",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "description": "A Vencord plugin that automates Discord Quests with smart real-time progress tracking",
     "author": "zpt0.dev",
     "license": "AGPL-3.0-only",
@@ -18,6 +18,9 @@
     ],
     "type": "module",
     "private": true,
+    "overrides": {
+        "@types/react": "$@types/react"
+    },
     "scripts": {
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
@@ -30,15 +33,15 @@
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
-        "@types/node": "^26.4.0",
-        "@types/react": "^19.0.10",
+        "@types/node": "^26.5.1",
+        "@types/react": "^19.3.0",
         "@vencord/discord-types": "^1.0.2",
-        "@vitest/coverage-v8": "^4.1.11",
+        "@vitest/coverage-v8": "^5.0.0",
         "eslint": "^10.9.1",
         "eslint-config-prettier": "^10.1.8",
         "prettier": "^3.9.5",
         "typescript": "^5.3.0",
-        "typescript-eslint": "^8.68.0",
-        "vitest": "^4.1.11"
+        "typescript-eslint": "^8.70.0",
+        "vitest": "^5.0.0"
     }
 }
