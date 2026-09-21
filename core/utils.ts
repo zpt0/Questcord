@@ -87,3 +87,32 @@ export function getThemeVariables() {
         successColor: "#43b581",
     };
 }
+
+/**
+ * Convert GitHub-flavored release notes to something Discord's message
+ * parser renders correctly: Discord has no `#` headings (they would show
+ * literally) and collapses single newlines into spaces (everything ends up
+ * on one line). Fenced code blocks are left untouched.
+ */
+export function formatReleaseNotesForDiscord(notes: string): string {
+    const normalized = (notes || "").replace(/\r\n/g, "\n");
+    const formatted = normalized
+        .split(/(```[\s\S]*?(?:```|$))/g)
+        .map((segment, index) => {
+            // Odd segments are fenced code blocks — leave them alone.
+            if (index % 2 === 1) return segment;
+            const converted = segment
+                .split("\n")
+                .map((line) => {
+                    const heading = line.match(/^#{1,6}\s+(.*)$/);
+                    if (heading) return `**${heading[1].trim()}**`;
+                    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) return "";
+                    return line;
+                })
+                .join("\n");
+            // Single newlines become paragraph breaks; existing blank lines stay.
+            return converted.replace(/(?<!\n)\n(?!\n)/g, "\n\n");
+        })
+        .join("");
+    return formatted.replace(/\n{3,}/g, "\n\n").trim();
+}
