@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.4]
+
+- Fix update modal rendering release notes as one line: GitHub markdown is now converted for Discord's parser (headings become bold, single line breaks become paragraphs, `---` rules dropped, code blocks untouched)
+
 ## [1.1.3]
 
 - Update system ported 1:1 from Clonecord: proper update modal (Current → New, rendered release notes) with Not Now / Discord / Update Now buttons instead of the progress pill
