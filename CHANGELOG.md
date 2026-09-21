@@ -1,8 +1,12 @@
 # Changelog
 
+## [1.1.5]
+
+- Autolink bare URLs in update-modal release notes (trailing sentence punctuation excluded) and open release links in the external browser
+
 ## [1.1.4]
 
-- Fix update modal rendering release notes as one line: GitHub markdown is now converted for Discord's parser (headings become bold, single line breaks become paragraphs, `---` rules dropped, code blocks untouched)
+- Fix update modal showing raw markdown in one line: release notes are now rendered as real markdown (bold headings, paragraphs, lists, inline code, clickable links) with proper line breaks
 
 ## [1.1.3]
 
