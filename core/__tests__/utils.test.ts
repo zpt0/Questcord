@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { isSafeReleaseUrl, parseReleaseBlocks, parseReleaseInline } from "../utils";
+import {
+    isSafeReleaseUrl,
+    normalizeQuestTileId,
+    parseReleaseBlocks,
+    parseReleaseInline,
+    questTileSelector,
+} from "../utils";
 
 describe("isSafeReleaseUrl", () => {
     it("allows http and https links", () => {
@@ -185,5 +191,46 @@ describe("parseReleaseBlocks", () => {
             { kind: "list", ordered: false, items: ["item one", "item two"] },
             { kind: "paragraph", lines: ["**Full Changelog**: https://github.com/a/b/compare"] },
         ]);
+    });
+});
+
+describe("normalizeQuestTileId", () => {
+    // REMOVABLE: LEGACY format tests (pure numeric tile ids).
+    describe("legacy", () => {
+        it("keeps pure numeric tile ids", () => {
+            expect(normalizeQuestTileId("quest-tile-1547360739918880860")).toBe(
+                "1547360739918880860"
+            );
+        });
+
+        it("rejects empty and non-numeric ids", () => {
+            expect(normalizeQuestTileId("")).toBeNull();
+            expect(normalizeQuestTileId("quest-tile-")).toBeNull();
+            expect(normalizeQuestTileId("quest-tile-abc")).toBeNull();
+        });
+    });
+
+    // REMOVABLE: SUFFIXED format tests (Discord section suffixes).
+    describe("suffixed", () => {
+        it.each(["featured", "ending-soon", "orb", "new-section-2"])(
+            "strips known and future suffix %s",
+            (suffix) => {
+                expect(normalizeQuestTileId(`quest-tile-1547360739918880860-${suffix}`)).toBe(
+                    "1547360739918880860"
+                );
+            }
+        );
+
+        it("rejects suffix without numeric id", () => {
+            expect(normalizeQuestTileId("quest-tile--featured")).toBeNull();
+        });
+    });
+});
+
+describe("questTileSelector", () => {
+    it("matches legacy and suffixed tiles", () => {
+        expect(questTileSelector("1547360739918880860")).toBe(
+            '[id="quest-tile-1547360739918880860"],[id^="quest-tile-1547360739918880860-"]'
+        );
     });
 });

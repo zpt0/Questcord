@@ -1,4 +1,39 @@
 import { activeQuests, getProgressBarKey } from "./state";
+
+// REMOVABLE: LEGACY quest tiles use `quest-tile-<digits>` with no suffix.
+const LEGACY_QUEST_TILE_BODY_RE = /^\d+$/;
+// REMOVABLE: SUFFIXED quest tiles use `quest-tile-<digits>-<section>`
+// (e.g. -featured, -ending-soon, -orb). Suffix is matched generically so
+// future Discord sections keep working without a whitelist.
+const SUFFIXED_QUEST_TILE_BODY_RE = /^(\d+)-[a-z0-9-]+$/i;
+const QUEST_TILE_PREFIX = "quest-tile-";
+
+/**
+ * Normalize a quest tile DOM id to the pure numeric quest id.
+ * Accepts both legacy (`quest-tile-123`) and suffixed
+ * (`quest-tile-123-featured`) formats. Returns null when not parseable.
+ * Sync and allocation-light: runs inside the MutationObserver hot path.
+ */
+export function normalizeQuestTileId(tileId: string): string | null {
+    if (!tileId) return null;
+    const raw = tileId.startsWith(QUEST_TILE_PREFIX)
+        ? tileId.slice(QUEST_TILE_PREFIX.length)
+        : tileId;
+    // REMOVABLE: LEGACY fast path (exact digits, most common).
+    if (LEGACY_QUEST_TILE_BODY_RE.test(raw)) return raw;
+    // REMOVABLE: SUFFIXED fallback (strip `-section`, keep leading digits).
+    const m = raw.match(SUFFIXED_QUEST_TILE_BODY_RE);
+    return m ? m[1] : null;
+}
+
+/**
+ * Build a selector matching a quest tile in both legacy and suffixed form.
+ * Single querySelector round, no extra DOM passes.
+ */
+export function questTileSelector(questId: string): string {
+    if (!LEGACY_QUEST_TILE_BODY_RE.test(questId)) return `[id="quest-tile-${questId}"]`;
+    return `[id="quest-tile-${questId}"],[id^="quest-tile-${questId}-"]`;
+}
 export function safeTimeout(
     callback: () => void,
     delay: number,
