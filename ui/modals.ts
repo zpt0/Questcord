@@ -1,7 +1,7 @@
 import { findByPropsLazy } from "@webpack";
 import { QuestsStore } from "../core/stores";
 import { ALL_TASK_TYPES } from "../core/types";
-import { getThemeVariables } from "../core/utils";
+import { getThemeVariables, questTileSelector } from "../core/utils";
 const openModal = findByPropsLazy("openModal", "closeModal")?.openModal;
 export function showQuestConflictModal(
     runningQuestId: string,
@@ -18,8 +18,8 @@ export function showQuestConflictModal(
             }
             const runningQuestName = runningQuest.config?.messages?.questName || "Unknown Quest";
             const newQuestName = newQuest.config?.messages?.questName || "Unknown Quest";
-            const runningQuestTile = document.querySelector(`[id="quest-tile-${runningQuestId}"]`);
-            const newQuestTile = document.querySelector(`[id="quest-tile-${newQuestId}"]`);
+            const runningQuestTile = document.querySelector(questTileSelector(runningQuestId));
+            const newQuestTile = document.querySelector(questTileSelector(newQuestId));
             if (!openModal) {
                 const result = confirm(
                     `Quest Already Running\n\n` +

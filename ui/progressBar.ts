@@ -1,10 +1,11 @@
 import { settings } from "../settings";
 import { activeQuests, getProgressBarKey, isPluginStopping, progressBars } from "../core/state";
+import { questTileSelector } from "../core/utils";
 import { updateQuestPill } from "./notifications";
 
 export function getDiscordProgressPercent(questId: string): number | null {
     try {
-        const questTile = document.querySelector(`[id="quest-tile-${questId}"]`);
+        const questTile = document.querySelector(questTileSelector(questId));
         if (!questTile) return null;
         const allCircles = questTile.querySelectorAll("circle");
         let greenCircle: Element | null = null;

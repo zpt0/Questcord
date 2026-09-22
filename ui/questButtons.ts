@@ -9,7 +9,7 @@ import {
     setRefreshQuestButtonsRef,
 } from "../core/state";
 import { QuestsStore } from "../core/stores";
-import { suppressConsole, restoreConsole } from "../core/utils";
+import { suppressConsole, restoreConsole, normalizeQuestTileId } from "../core/utils";
 import { ALL_TASK_TYPES } from "../core/types";
 import { startQuest } from "../quests/manager";
 import { settings } from "../settings";
@@ -66,8 +66,8 @@ function injectQuestButtons() {
         const questTiles = document.querySelectorAll('[id^="quest-tile-"]');
         if (questTiles.length === 0) return;
         questTiles.forEach((tile) => {
-            const questId = (tile.id || "").replace("quest-tile-", "");
-            if (!questId || !/^\d+$/.test(questId)) return;
+            const questId = normalizeQuestTileId(tile.id || "");
+            if (!questId) return;
             const existingBtn = tile.querySelector("[data-quest-autocomplete-btn]") as HTMLElement;
             const quest = safeGetQuest(questId);
             if (quest?.userStatus?.completedAt) {
