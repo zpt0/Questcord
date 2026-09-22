@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.0]
+
+- Support the new Discord quest design: quest tiles now carry section suffixes (e.g. `-featured`, `-ending-soon`, `-orb`), the Auto Complete button, progress tracking and conflict modal handle both suffixed and legacy tile ids
+
 ## [1.1.5]
 
 - Autolink bare URLs in update-modal release notes (trailing sentence punctuation excluded) and open release links in the external browser
