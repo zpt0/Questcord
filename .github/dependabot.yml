@@ -9,4 +9,8 @@ updates:
           - "dependencies"
       assignees:
           - "zpt0"
-      open-pull-requests-limit: 10
+      open-pull-requests-limit: 5
+      groups:
+          dev-dependencies:
+              patterns:
+                  - "*"
