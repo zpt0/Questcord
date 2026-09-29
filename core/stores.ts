@@ -137,3 +137,17 @@ export function findFluxDispatcher(): any {
         return null;
     }
 }
+
+export function questsLoaded(): boolean {
+    try {
+        if (typeof QuestsStore?.getQuests === "function") {
+            const quests = QuestsStore.getQuests();
+            if (Array.isArray(quests)) return quests.length > 0;
+            if (quests && typeof quests === "object") return Object.keys(quests).length > 0;
+        }
+        if (typeof QuestsStore?.getQuest === "function") return true;
+        return !!QuestsStore;
+    } catch {
+        return !!QuestsStore;
+    }
+}

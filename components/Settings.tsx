@@ -4,6 +4,7 @@ import { Forms, Select, Slider } from "@webpack/common";
 import { settings } from "../settings";
 import { VersionDisplay } from "./VersionDisplay";
 import { ColorPicker } from "./ColorPicker";
+import { QueueSettings } from "./QueueSettings";
 import { clearSavedQuestStates } from "../quests/manager";
 import { notify } from "../ui/notifications";
 
@@ -132,6 +133,7 @@ export function QuestSettings() {
     return (
         <div className={cl("root")}>
             <VersionDisplay />
+            <QueueSettings />
 
             <Forms.FormSection title="Pill Position">
                 <SettingSelect

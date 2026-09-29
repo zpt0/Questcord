@@ -1,4 +1,4 @@
-export const PLUGIN_VERSION = "1.2.0";
+export const PLUGIN_VERSION = "1.3.0";
 export const LOG_PREFIX = "[Questcord]";
 export const GITHUB_REPO = "zpt0/Questcord";
 export const UPDATE_CHECK_URL = GITHUB_REPO
@@ -10,3 +10,8 @@ export const GITHUB_RELEASE_URL = GITHUB_REPO
 export const UPDATE_CHECK_ENABLED = !!GITHUB_REPO;
 export const UPDATES_CHANNEL_ID = "1532348047697121340";
 export const SUPPORT_INVITE_CODE = "9ra6MwHTHy";
+
+// Per-account DataStore keys (suffixed with `:<userId>` at runtime).
+export const SAVED_QUESTS_KEY = "questcord-active-quests";
+export const QUEUE_KEY = "questcord-queue";
+export const QUEUE_ENABLED_KEY = "questcord-queue-enabled";

@@ -4,6 +4,7 @@ import { activeQuests, debugLog, getProgressBarKey, isPluginStopping } from "../
 import { ChannelStore, GuildChannelStore } from "../core/stores";
 import { Quest, getTaskConfig, getQuestName } from "../core/types";
 import { safeTimeout } from "../core/utils";
+import { settings } from "../settings";
 import { notify, completeQuestPill, updateQuestPill } from "../ui/notifications";
 import { removeProgressBar, updateProgressBar } from "../ui/progressBar";
 import { cleanupQuest } from "./manager";
@@ -51,8 +52,14 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
         }
         const streamKey = `call:${channelId}:1`;
         const key = getProgressBarKey(quest.id, userId);
-        const minInterval = 0.8;
-        const maxInterval = 1.5;
+        const heartbeatMode =
+            (settings.store as { activityHeartbeat?: string }).activityHeartbeat ?? "fast";
+        const [minInterval, maxInterval] =
+            heartbeatMode === "official"
+                ? [58, 62]
+                : heartbeatMode === "balanced"
+                  ? [18, 22]
+                  : [0.8, 1.5];
         let iterations = 0;
         let consecutiveErrors = 0;
         while (iterations++ < MAX_ACTIVITY_ITERATIONS) {

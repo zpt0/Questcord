@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.0]
+
+- New Quest Queue: add quests with the + Queue tile button, auto-accept and complete them one at a time with Videos-first / Games-first preference, enable/pause and list management in settings
+- Per-account data isolation: saved resume states and queue are namespaced per Discord user with legacy migration, account switching (LOGOUT / CONNECTION_OPEN) stops runs and clears state instead of leaking
+- Userplugin build fix: stylesheet loaded via `?managed` (`managedStyle`) instead of a plain CSS import
+- Activity heartbeat setting: fast (~1s, previous behaviour) / balanced (~20s) / official (~60s)
+- GPU-accelerated progress bar (`transform: scaleX` + `will-change`) and `prefers-reduced-motion` support
+- Quest manager now reports `started | cancelled | invalid | conflict | error` results with `toggle` / `prompt` / `auto` options for queue control, plus session-ended notifications
+
 ## [1.2.0]
 
 - Support the new Discord quest design: quest tiles now carry section suffixes (e.g. `-featured`, `-ending-soon`, `-orb`), the Auto Complete button, progress tracking and conflict modal handle both suffixed and legacy tile ids
