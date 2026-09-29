@@ -37,12 +37,16 @@ import {
 
 const SETTLE_MS = 1500;
 const ACCEPT_SPACING_MS = 2000;
+// "Now running" toast is skipped when the run follows a manual queue add
+// within this window — the "added" toast already confirmed the action.
+export const NOW_RUNNING_SUPPRESS_MS = 5000;
 
 let active = false;
 let busy = false;
 let accepting = false;
 let hadWork = false;
 let acceptPausedUntil = 0;
+let lastManualAddAt = 0;
 const pausedIds = new Set<string>();
 let pending: ReturnType<typeof setTimeout> | undefined;
 let unsubscribers: Array<() => void> = [];
@@ -150,7 +154,9 @@ async function tick() {
             return;
         }
         hadWork = true;
-        notify("Queue", `Now running: ${getName(next.quest!)}`, "info");
+        if (Date.now() - lastManualAddAt > NOW_RUNNING_SUPPRESS_MS) {
+            notify("Queue", `Now running: ${getName(next.quest!)}`, "info");
+        }
         const result = await startQuest(next.entry.questId, {
             toggle: false,
             prompt: false,
@@ -187,6 +193,7 @@ export async function startQueue() {
 export function stopQueue() {
     active = false;
     pausedIds.clear();
+    lastManualAddAt = 0;
     clearTimeout(pending);
     unsubscribers.forEach((u) => {
         try {
@@ -204,5 +211,6 @@ export function toggleQueued(questId: string, quest?: Quest) {
         return;
     }
     addToQueue(questId);
+    lastManualAddAt = Date.now();
     notify("Queue", `${name} added`, "info");
 }
