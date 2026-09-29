@@ -37,6 +37,32 @@ export const settings = definePluginSettings({
             "Automatically restart quest automation once when progress stalls (off by default)",
         default: false,
     },
+    activityHeartbeat: {
+        type: OptionType.SELECT,
+        description: "How often activity quests report progress (slower is safer on rate limits)",
+        options: [
+            { label: "Fast (~1s, previous behaviour)", value: "fast" },
+            { label: "Balanced (~20s)", value: "balanced" },
+            { label: "Official pace (~60s)", value: "official" },
+        ],
+        default: "fast",
+    },
+    queueEnabled: {
+        type: OptionType.BOOLEAN,
+        description: "Run queued quests automatically (see queue popout)",
+        default: true,
+        hidden: true,
+    },
+    queuePreference: {
+        type: OptionType.SELECT,
+        description: "Which kind of quest the queue runs first",
+        options: [
+            { label: "Videos first", value: "videos" },
+            { label: "Games first", value: "games" },
+        ],
+        default: "videos",
+        hidden: true,
+    },
 
     // ── Debug (visible in Vencord settings) ──
     debugMode: {

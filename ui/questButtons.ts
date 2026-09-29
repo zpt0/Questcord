@@ -12,6 +12,8 @@ import { QuestsStore } from "../core/stores";
 import { suppressConsole, restoreConsole, normalizeQuestTileId } from "../core/utils";
 import { ALL_TASK_TYPES } from "../core/types";
 import { startQuest } from "../quests/manager";
+import { isQueued, getVersion } from "../quests/queue/store";
+import { toggleQueued } from "../quests/queue/runner";
 import { settings } from "../settings";
 let questButtonsObserver: MutationObserver | null = null;
 let isInjecting = false;
@@ -185,6 +187,12 @@ function injectQuestButtons() {
                 setTimeout(() => refreshQuestButtonsRef?.(), 150);
             });
             lastDiscordButton.insertAdjacentElement("afterend", button);
+            // Queue toggle button (second action, themed like Discord secondary).
+            try {
+                syncQueueButton(buttonParent, questId, discordBtnComputedStyle);
+            } catch (e) {
+                debugLog(`${LOG_PREFIX} Queue button sync failed:`, e);
+            }
         });
     } catch (e) {
         console.warn(`${LOG_PREFIX} Button injection error:`, e);
@@ -204,9 +212,75 @@ function injectQuestButtons() {
 }
 function refreshQuestButtons() {
     document.querySelectorAll("[data-quest-autocomplete-btn]").forEach((el) => el.remove());
+    document.querySelectorAll("[data-questcord-queue-btn]").forEach((el) => el.remove());
     if (!isPluginStopping) {
         injectQuestButtons();
     }
+}
+
+function syncQueueButton(parent: HTMLElement, questId: string, computedStyle: CSSStyleDeclaration) {
+    const queued = isQueued(questId);
+    // Bind to version so a store change forces re-render on next refresh.
+    void getVersion;
+    const existing = parent.querySelector(
+        `[data-questcord-queue-btn][data-quest-id="${questId}"]`
+    ) as HTMLElement | null;
+    if (existing) {
+        const current = existing.getAttribute("data-queued") === "true";
+        if (current === queued) return;
+        existing.remove();
+    }
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("data-questcord-queue-btn", "true");
+    btn.setAttribute("data-quest-id", questId);
+    btn.setAttribute("data-queued", queued.toString());
+    btn.title = queued ? "Remove from quest queue" : "Add to quest queue";
+    btn.style.cssText = `
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-sizing: border-box;
+        border-radius: 3px;
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 16px;
+        padding: 2px 8px;
+        user-select: none;
+        min-width: 0;
+        min-height: ${computedStyle.minHeight || "38px"};
+        height: ${computedStyle.height || "38px"};
+        flex: 1 1 0;
+        cursor: pointer;
+        overflow: hidden;
+        color: var(--text-default, #fff);
+        background-color: var(--background-mod-subtle, rgba(255,255,255,0.08));
+        border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+    `;
+    const span = document.createElement("span");
+    span.style.cssText = `
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+    `;
+    span.textContent = queued ? "Queued ✓" : "+ Queue";
+    btn.appendChild(span);
+    btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+            toggleQueued(questId);
+        } catch (err) {
+            console.warn(`${LOG_PREFIX} toggleQueued failed:`, err);
+        }
+        setTimeout(() => refreshQuestButtonsRef?.(), 150);
+    });
+    // Insert after the Auto Complete button when present, else at end.
+    const autoBtn = parent.querySelector("[data-quest-autocomplete-btn]");
+    if (autoBtn?.nextSibling) parent.insertBefore(btn, autoBtn.nextSibling);
+    else parent.appendChild(btn);
 }
 export function setupQuestButtonObserver() {
     if (questButtonsObserver) {
@@ -277,6 +351,11 @@ export function cleanupQuestButtonObserver() {
     }
     try {
         document.querySelectorAll("[data-quest-autocomplete-btn]").forEach((btn) => {
+            try {
+                btn.remove();
+            } catch {}
+        });
+        document.querySelectorAll("[data-questcord-queue-btn]").forEach((btn) => {
             try {
                 btn.remove();
             } catch {}
