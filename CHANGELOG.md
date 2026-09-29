@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.1]
+
+- Fix duplicate "Queue added" bubble: central notification dedup guard suppresses identical notifications fired twice from any source, and the "Now running" toast is skipped when the run directly follows a manual queue add
+- Progress spinner slowed down (1s → 1.5s per rotation)
+
 ## [1.3.0]
 
 - New Quest Queue: add quests with the + Queue tile button, auto-accept and complete them one at a time with Videos-first / Games-first preference, enable/pause and list management in settings
