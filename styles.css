@@ -256,7 +256,7 @@
     border-top-color: var(--qc-accent);
     border-radius: 50%;
     animation:
-        questSpin 1s linear infinite,
+        questSpin 1.5s linear infinite,
         questSpinnerEntry 1s ease;
     flex-shrink: 0;
     transition: all 0.3s;
