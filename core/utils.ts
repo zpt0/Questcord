@@ -34,6 +34,36 @@ export function questTileSelector(questId: string): string {
     if (!LEGACY_QUEST_TILE_BODY_RE.test(questId)) return `[id="quest-tile-${questId}"]`;
     return `[id="quest-tile-${questId}"],[id^="quest-tile-${questId}-"]`;
 }
+
+export type NotificationType = "success" | "info" | "error" | "cancel";
+
+// General anti-duplicate guard: identical notifications fired twice from any
+// source (double observer runs, re-renders, race between systems) only show once.
+export const NOTIFICATION_DEDUP_WINDOW_MS = 1500;
+
+export interface NotificationSignature {
+    key: string;
+    at: number;
+}
+
+export function buildNotificationKey(
+    title: string,
+    body: string,
+    type: NotificationType,
+    questId?: string
+): string {
+    return `${type}\n${questId ?? ""}\n${title}\n${body}`;
+}
+
+export function shouldSuppressNotification(
+    last: NotificationSignature | null,
+    key: string,
+    now: number,
+    windowMs: number = NOTIFICATION_DEDUP_WINDOW_MS
+): boolean {
+    if (!last) return false;
+    return last.key === key && now - last.at < windowMs;
+}
 export function safeTimeout(
     callback: () => void,
     delay: number,

@@ -1,6 +1,11 @@
 import { UserStore } from "@webpack/common";
 import { LOG_PREFIX } from "../constants";
 import { settings } from "../settings";
+import {
+    buildNotificationKey,
+    shouldSuppressNotification,
+    type NotificationSignature,
+} from "../core/utils";
 import { cancelQuest } from "../quests/manager";
 import { applyPillContainerStyle } from "./pillStyles";
 
@@ -214,6 +219,16 @@ function showSubPill(
 ): void {
     const container = getPillContainer();
 
+    // General guard: an identical bubble already on screen is never stacked.
+    try {
+        const visible = container.querySelectorAll(".quest-sub-pill:not(.hiding)");
+        for (const el of Array.from(visible)) {
+            const t = el.querySelector(".quest-sub-pill-title")?.textContent ?? "";
+            const b = el.querySelector(".quest-sub-pill-body")?.textContent ?? "";
+            if (el.classList.contains(type) && t === title && b === body) return;
+        }
+    } catch {}
+
     const existingPills = container.querySelectorAll(".quest-sub-pill:not(.hiding)");
     if (existingPills.length > 4) {
         const oldest = existingPills[0] as HTMLElement;
@@ -241,6 +256,8 @@ function showSubPill(
     }, duration);
 }
 
+let lastShown: NotificationSignature | null = null;
+
 export function notify(
     title: string,
     body: string,
@@ -249,6 +266,10 @@ export function notify(
 ): void {
     try {
         if (!settings.store.showNotifications) return;
+
+        const key = buildNotificationKey(title, body, type, questId);
+        if (shouldSuppressNotification(lastShown, key, Date.now())) return;
+        lastShown = { key, at: Date.now() };
 
         if (questId && questPills.has(questId)) {
             showPillSlideMessage(questId, body, type);
@@ -261,6 +282,7 @@ export function notify(
 }
 
 export function cleanupAllPills(): void {
+    lastShown = null;
     questPills.forEach((row) => {
         try {
             row.remove();
