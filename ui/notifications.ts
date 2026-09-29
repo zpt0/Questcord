@@ -102,7 +102,7 @@ export function updateQuestPill(questId: string, body?: string, percent?: number
         if (percentEl) percentEl.textContent = `${safePercent}%`;
 
         const progressFill = pill.querySelector(".quest-pill-progress-fill") as HTMLElement;
-        if (progressFill) progressFill.style.width = `${safePercent}%`;
+        if (progressFill) progressFill.style.transform = `scaleX(${safePercent / 100})`;
     }
 }
 
@@ -131,7 +131,7 @@ export function completeQuestPill(
     }
 
     const progressFill = pill.querySelector(".quest-pill-progress-fill") as HTMLElement;
-    if (progressFill) progressFill.style.width = "100%";
+    if (progressFill) progressFill.style.transform = "scaleX(1)";
 
     const slides = row.querySelectorAll(".quest-pill-slide");
     slides.forEach((s) => s.remove());

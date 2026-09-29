@@ -337,7 +337,7 @@
 
 .quest-pill-progress-fill {
     height: 100%;
-    width: 0%;
+    width: 100%;
     background: linear-gradient(
         90deg,
         var(--qc-accent),
@@ -345,7 +345,10 @@
         color-mix(in srgb, var(--qc-accent) 30%, #43b581)
     );
     border-radius: 2px;
-    transition: width 0.3s ease;
+    transform: scaleX(0);
+    transform-origin: left center;
+    will-change: transform;
+    transition: transform 0.3s ease;
 }
 
 .quest-pill-actions {
@@ -600,4 +603,24 @@
     font-size: 12px;
     color: rgba(255, 255, 255, 0.7);
     line-height: 1.3;
+}
+
+[data-questcord-queue-btn] {
+    will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .quest-pill,
+    .quest-pill-compact,
+    .quest-pill-spinner,
+    .quest-sub-pill,
+    .quest-pill-slide,
+    .quest-pill.hiding,
+    .quest-sub-pill.hiding {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+    .quest-pill-progress-fill {
+        transition-duration: 0.01ms !important;
+    }
 }

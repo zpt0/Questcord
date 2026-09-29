@@ -1,6 +1,7 @@
 import { DataStore } from "@api/index";
 import { UserStore } from "@webpack/common";
-import { LOG_PREFIX } from "../constants";
+import { LOG_PREFIX, SAVED_QUESTS_KEY } from "../constants";
+import { accountReady, getOwner, keyFor, loadOwned } from "../core/account";
 import { settings } from "../settings";
 import {
     activeQuests,
@@ -28,9 +29,58 @@ import { completeActivityQuest } from "./activity";
 import { completePlayQuest } from "./play";
 import { completeStreamQuest } from "./stream";
 import { completeVideoQuest } from "./video";
-const SAVED_STATE_KEY = "questcord-active-quests";
+export const SAVED_STATE_KEY = SAVED_QUESTS_KEY;
 // Internal: saved resume entries older than this are discarded.
-const SAVED_STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const SAVED_STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Queue bookkeeping: which quests were started by the queue (vs manually),
+// plus a lightweight session-ended pub/sub so the queue can dequeue finished quests.
+const autoStartedQuests = new Set<string>();
+type SessionEndListener = (session: { id: string }) => void;
+const sessionEndListeners = new Set<SessionEndListener>();
+
+export function onSessionEnded(listener: SessionEndListener): () => void {
+    sessionEndListeners.add(listener);
+    return () => {
+        sessionEndListeners.delete(listener);
+    };
+}
+
+function emitSessionEnded(questId: string) {
+    if (sessionEndListeners.size === 0) return;
+    for (const listener of Array.from(sessionEndListeners)) {
+        try {
+            listener({ id: questId });
+        } catch (e) {
+            debugLog(`${LOG_PREFIX} Session listener error:`, e);
+        }
+    }
+}
+
+export const isAutoStarted = (questId: string) => autoStartedQuests.has(questId);
+
+export function isRunning(questId: string): boolean {
+    for (const data of activeQuests.values()) {
+        if (data.questId === questId && data.isProcessing) return true;
+    }
+    return false;
+}
+
+export function resetResume() {
+    autoStartedQuests.clear();
+}
+
+export function cancelAll() {
+    const entries = Array.from(activeQuests.entries());
+    for (const [, data] of entries) {
+        try {
+            cancelQuest(data.questId, data.userId);
+        } catch (e) {
+            debugLog(`${LOG_PREFIX} cancelAll error:`, e);
+        }
+    }
+    autoStartedQuests.clear();
+}
 export function cleanupQuest(questId: string, userId: string) {
     const key = getProgressBarKey(questId, userId);
     clearQuestTimers(questId, userId);
@@ -46,10 +96,12 @@ export function cleanupQuest(questId: string, userId: string) {
         cleanupFunctions.delete(key);
     }
     activeQuests.delete(key);
+    autoStartedQuests.delete(questId);
     removeProgressBar(questId, userId);
     removeSavedQuestState(questId).catch((e) => {
         console.warn(`${LOG_PREFIX} Failed to remove saved state:`, e);
     });
+    emitSessionEnded(questId);
     setTimeout(() => {
         if (refreshQuestButtonsRef) {
             refreshQuestButtonsRef();
@@ -89,7 +141,12 @@ function canRunInParallel(newTaskType: string): {
 }
 async function saveQuestState(questId: string, taskType: string) {
     try {
-        const saved: SavedQuestState[] = (await DataStore.get(SAVED_STATE_KEY)) || [];
+        const key = keyFor(SAVED_STATE_KEY);
+        const saved: SavedQuestState[] = key
+            ? ((await DataStore.get(key)) as SavedQuestState[] | undefined) ||
+              (await loadOwned<SavedQuestState[]>(SAVED_STATE_KEY)) ||
+              []
+            : [];
         const existing = saved.findIndex((s) => s.questId === questId);
         const entry: SavedQuestState = { questId, taskType, startedAt: Date.now() };
         if (existing >= 0) {
@@ -97,23 +154,30 @@ async function saveQuestState(questId: string, taskType: string) {
         } else {
             saved.push(entry);
         }
-        await DataStore.set(SAVED_STATE_KEY, saved);
+        if (key) await DataStore.set(key, saved);
     } catch (e) {
         console.warn(`${LOG_PREFIX} Failed to save quest state:`, e);
     }
 }
 async function removeSavedQuestState(questId: string) {
     try {
-        const saved: SavedQuestState[] = (await DataStore.get(SAVED_STATE_KEY)) || [];
+        const key = keyFor(SAVED_STATE_KEY);
+        if (!key) return;
+        const saved: SavedQuestState[] =
+            ((await DataStore.get(key)) as SavedQuestState[] | undefined) ||
+            (await loadOwned<SavedQuestState[]>(SAVED_STATE_KEY)) ||
+            [];
         const filtered = saved.filter((s) => s.questId !== questId);
-        await DataStore.set(SAVED_STATE_KEY, filtered);
+        await DataStore.set(key, filtered);
     } catch (e) {
         console.warn(`${LOG_PREFIX} Failed to remove saved quest state:`, e);
     }
 }
 export async function clearSavedQuestStates() {
     try {
-        await DataStore.set(SAVED_STATE_KEY, []);
+        const key = keyFor(SAVED_STATE_KEY);
+        if (key) await DataStore.set(key, []);
+        else await DataStore.set(SAVED_STATE_KEY, []);
         debugLog(`${LOG_PREFIX} Cleared all saved quest states`);
     } catch (e) {
         console.warn(`${LOG_PREFIX} Failed to clear saved quest states:`, e);
@@ -121,8 +185,14 @@ export async function clearSavedQuestStates() {
 }
 export async function checkAndResumeQuests() {
     if (!settings.store.autoResumeAfterReload) return;
+    if (!accountReady() && getOwner() == null) {
+        // Owner not set yet (startup race); caller retries via late resume.
+        debugLog(`${LOG_PREFIX} Resume deferred: no account owner yet`);
+        return;
+    }
     try {
-        const saved: SavedQuestState[] = (await DataStore.get(SAVED_STATE_KEY)) || [];
+        const saved: SavedQuestState[] =
+            (await loadOwned<SavedQuestState[]>(SAVED_STATE_KEY)) || [];
         if (saved.length === 0) return;
         debugLog(`${LOG_PREFIX} Found ${saved.length} saved quest(s), attempting resume...`);
         let resumedNonVideo = false;
@@ -182,22 +252,51 @@ export async function checkAndResumeQuests() {
         console.warn(`${LOG_PREFIX} Failed to check saved quests:`, e);
     }
 }
-export async function startQuest(questId: string) {
+export type StartQuestResult = "started" | "cancelled" | "invalid" | "conflict" | "error";
+
+export async function acceptQuestById(questId: string): Promise<{
+    ok: boolean;
+    reason?: string;
+    retryAt?: number;
+}> {
+    try {
+        await rateLimitedPost(`/quests/${questId}/enroll`, { location: 2 });
+        await new Promise((r) => setTimeout(r, 1500));
+        return { ok: true };
+    } catch (e: any) {
+        const status = e?.status ?? e?.response?.status;
+        if (status === 429) {
+            const retryAfter = e?.retryAfter ?? 30_000;
+            return {
+                ok: false,
+                reason: "Rate limited",
+                retryAt: Date.now() + retryAfter,
+            };
+        }
+        return { ok: false, reason: e?.message ?? "Enroll failed" };
+    }
+}
+
+export async function startQuest(
+    questId: string,
+    opts: { toggle?: boolean; prompt?: boolean; auto?: boolean } = {}
+): Promise<StartQuestResult> {
     if (!QuestsStore) {
         notify("Error", "Stores not initialized", "error");
-        return;
+        return "error";
     }
     const userId = UserStore.getCurrentUser()?.id;
     if (!userId) {
         notify("Error", "Could not get current user", "error");
-        return;
+        return "error";
     }
     const key = getProgressBarKey(questId, userId);
     if (activeQuests.has(key)) {
         const questData = activeQuests.get(key)!;
         if (questData.isProcessing) {
+            if (opts.toggle === false) return "started";
             cancelQuest(questId, userId);
-            return;
+            return "cancelled";
         }
     }
     try {
@@ -210,11 +309,11 @@ export async function startQuest(questId: string) {
         }
         if (!quest) {
             notify("Error", "Quest not found", "error");
-            return;
+            return "invalid";
         }
         if (quest.userStatus?.completedAt) {
             notify("Already Completed", "This quest is already completed", "info");
-            return;
+            return "invalid";
         }
         if (!quest.userStatus?.enrolledAt) {
             try {
@@ -233,7 +332,7 @@ export async function startQuest(questId: string) {
                         "Please click 'Accept Quest' manually in Discord first!",
                         "error"
                     );
-                    return;
+                    return "error";
                 }
             } catch (enrollError: any) {
                 console.error(`${LOG_PREFIX} Auto-enroll failed:`, enrollError);
@@ -245,12 +344,12 @@ export async function startQuest(questId: string) {
                 "Please click 'Accept Quest' manually in Discord first!",
                 "error"
             );
-            return;
+            return "conflict";
         }
         const expiresAt = quest.config?.expiresAt ?? quest.expiresAt;
         if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
             notify("Quest Expired", "This quest has expired", "error");
-            return;
+            return "invalid";
         }
         const taskConfig = getTaskConfig(quest);
         let taskName = taskConfig
@@ -295,7 +394,7 @@ export async function startQuest(questId: string) {
                 "Could not determine quest type. Try accepting the quest manually first.",
                 "error"
             );
-            return;
+            return "invalid";
         }
         const finalTaskConfig = getTaskConfig(quest);
 
@@ -336,6 +435,7 @@ export async function startQuest(questId: string) {
 
         const { canRun, conflictQuestId } = canRunInParallel(taskName);
         if (!canRun && conflictQuestId) {
+            if (opts.prompt === false) return "conflict";
             const shouldSwitch = await showQuestConflictModal(conflictQuestId, questId);
             if (shouldSwitch) {
                 const runningUserId = UserStore.getCurrentUser()?.id;
@@ -343,7 +443,7 @@ export async function startQuest(questId: string) {
                     cancelQuest(conflictQuestId, runningUserId);
                 }
             } else {
-                return;
+                return "conflict";
             }
         }
         const targetProgress = finalTaskConfig?.tasks?.[taskName]?.target || 0;
@@ -362,6 +462,7 @@ export async function startQuest(questId: string) {
         });
         await saveQuestState(questId, taskName);
         createQuestPill(questId, questName);
+        if (opts.auto === true) autoStartedQuests.add(questId);
         const isDesktopApp = typeof (window as any).DiscordNative !== "undefined";
         switch (taskName) {
             case "WATCH_VIDEO":
@@ -380,6 +481,7 @@ export async function startQuest(questId: string) {
                         questId
                     );
                     cleanupQuest(questId, userId);
+                    return "invalid";
                 }
                 break;
             case "STREAM_ON_DESKTOP":
@@ -393,9 +495,18 @@ export async function startQuest(questId: string) {
                         questId
                     );
                     cleanupQuest(questId, userId);
+                    return "invalid";
                 }
                 break;
             case "ACHIEVEMENT_IN_ACTIVITY":
+                notify(
+                    "Unsupported Quest",
+                    "This quest requires in-game achievements and cannot be automated.",
+                    "error",
+                    questId
+                );
+                cleanupQuest(questId, userId);
+                return "invalid";
             case "PLAY_ACTIVITY":
                 await completeActivityQuest(quest, userId);
                 break;
@@ -403,11 +514,13 @@ export async function startQuest(questId: string) {
                 console.warn(`${LOG_PREFIX} Unknown task type: ${taskName}`);
                 notify("Unknown Quest Type", `Unsupported task: ${taskName}`, "error", questId);
                 cleanupQuest(questId, userId);
-                break;
+                return "invalid";
         }
+        return "started";
     } catch (error) {
         console.error(`${LOG_PREFIX} startQuest error:`, error);
         notify("Quest Error", "An unexpected error occurred", "error", questId);
         cleanupQuest(questId, userId);
+        return "error";
     }
 }
