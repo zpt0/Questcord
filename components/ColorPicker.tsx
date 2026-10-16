@@ -244,11 +244,11 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                             borderRadius: 12,
                             padding: 12,
                             boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                            // max int32 so the popover beats every discord overlay
                             zIndex: 2147483647,
                             width: 240,
                         }}
                     >
-                        {/* Saturation/Value Panel */}
                         <div
                             ref={panelRef}
                             onMouseDown={handlePanelDown}
@@ -282,7 +282,6 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                             />
                         </div>
 
-                        {/* Hue Slider */}
                         <div
                             ref={hueRef}
                             onMouseDown={handleHueDown}
@@ -317,7 +316,6 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                             />
                         </div>
 
-                        {/* RGB Inputs */}
                         <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
                             {(
                                 [
@@ -374,7 +372,6 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                             ))}
                         </div>
 
-                        {/* Hex Input */}
                         <input
                             type="text"
                             value={hexInput}

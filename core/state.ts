@@ -17,6 +17,7 @@
  */
 
 import { QuestData } from "./types";
+// discord ids are numeric, so ":" can't collide inside a quest or user id
 const KEY_SEPARATOR = ":";
 export let activeQuests = new Map<string, QuestData>();
 export let progressBars = new Map<string, HTMLElement>();

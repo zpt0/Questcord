@@ -108,12 +108,6 @@ function EmptyState() {
 
 const ORDER_OPTIONS: Array<{ value: QueuePreference }> = [{ value: "videos" }, { value: "games" }];
 
-/**
- * Inline copies of the stylesheet rules for the popout container. The managed
- * stylesheet may not be applied in every loading order (Vencord only appends
- * its style root on DOMContentLoaded), so the visual surface is enforced here
- * as well. Values mirror styles.css.
- */
 const PANEL_STYLE: React.CSSProperties = {
     boxSizing: "border-box",
     display: "flex",
@@ -147,28 +141,24 @@ const LIST_STYLE: React.CSSProperties = {
     paddingRight: 4,
 };
 
-/** Settings variant: no popout surface, the surrounding section provides it. */
 const INLINE_STYLE: React.CSSProperties = {
     display: "flex",
     flexDirection: "column",
 };
 
-/**
- * Queue panel content: enable switch, priority picker and the sorted queue
- * list. Rendered inside the header "Queue" popout and reused in the plugin
- * settings (`inline`, without the popout surface).
- */
 export function QueuePanel({ inline = false }: { inline?: boolean } = {}) {
     const queueVersion = React.useSyncExternalStore(subscribeQueue, getQueueVersion);
     const preference = (settings.use(["queuePreference" as never]) as { queuePreference?: string })
         .queuePreference;
-    // Rows hop between waiting/running via manager state; poll lightly.
+
     const [, forceTick] = React.useReducer((n: number) => n + 1, 0);
     React.useEffect(() => {
+        // running % is not in the store, poll it so the row updates
         const interval = setInterval(forceTick, 1000);
         return () => clearInterval(interval);
     }, []);
 
+    // value unused on purpose, subscribing to the store is what redraws
     void queueVersion;
 
     const enabled = isQueueEnabled();

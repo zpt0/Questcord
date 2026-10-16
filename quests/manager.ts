@@ -42,11 +42,9 @@ import { completePlayQuest } from "./play";
 import { completeStreamQuest } from "./stream";
 import { completeVideoQuest } from "./video";
 export const SAVED_STATE_KEY = SAVED_QUESTS_KEY;
-// Internal: saved resume entries older than this are discarded.
+
 export const SAVED_STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Queue bookkeeping: which quests were started by the queue (vs manually),
-// plus a lightweight session-ended pub/sub so the queue can dequeue finished quests.
 const autoStartedQuests = new Set<string>();
 type SessionEndListener = (session: { id: string }) => void;
 const sessionEndListeners = new Set<SessionEndListener>();
@@ -78,7 +76,6 @@ export function isRunning(questId: string): boolean {
     return false;
 }
 
-/** True when any quest session is currently processing (used by the smart quest button). */
 export function isAnyRunning(): boolean {
     for (const data of activeQuests.values()) {
         if (data.isProcessing) return true;
@@ -86,7 +83,6 @@ export function isAnyRunning(): boolean {
     return false;
 }
 
-/** Progress percent (0-100) of a currently running quest, or null when not running. */
 export function getRunningPercent(questId: string): number | null {
     for (const data of activeQuests.values()) {
         if (data.questId === questId && data.isProcessing && data.targetProgress > 0) {
@@ -151,6 +147,7 @@ function getRunningNonVideoQuestId(): string | null {
     }
     return null;
 }
+// discord only tracks one non-video quest at a time; video quests can stack
 function canRunInParallel(newTaskType: string): {
     canRun: boolean;
     conflictQuestId: string | null;
@@ -211,7 +208,6 @@ export async function clearSavedQuestStates() {
 export async function checkAndResumeQuests() {
     if (!settings.store.autoResumeAfterReload) return;
     if (!accountReady() && getOwner() == null) {
-        // Owner not set yet (startup race); caller retries via late resume.
         debugLog(`${LOG_PREFIX} Resume deferred: no account owner yet`);
         return;
     }
@@ -285,7 +281,9 @@ export async function acceptQuestById(questId: string): Promise<{
     retryAt?: number;
 }> {
     try {
+        // location is a discord-defined surface id; changing it breaks enrollment
         await rateLimitedPost(`/quests/${questId}/enroll`, { location: 2 });
+        // store takes a moment to reflect enrollment before callers read it
         await new Promise((r) => setTimeout(r, 1500));
         return { ok: true };
     } catch (e: any) {

@@ -35,6 +35,7 @@ import {
 } from "../constants";
 import { parseReleaseBlocks, parseReleaseInline, type ReleaseInlineNode } from "../core/utils";
 
+// persisted key, renaming it makes old update prompts reappear
 const DISMISSED_KEY = "Questcord-dismissed-version";
 
 export function showUpdateModal(latestVersion: string, releaseNotes: string): void {
@@ -49,7 +50,6 @@ export function showUpdateModal(latestVersion: string, releaseNotes: string): vo
 }
 
 export async function navigateToUpdatesChannel(): Promise<void> {
-    // If we have a channel ID, try to navigate directly
     if (UPDATES_CHANNEL_ID) {
         const channel = ChannelStore.getChannel(UPDATES_CHANNEL_ID);
         if (channel?.guild_id) {
@@ -58,7 +58,6 @@ export async function navigateToUpdatesChannel(): Promise<void> {
         }
     }
 
-    // Try to resolve the invite code to find the guild
     if (SUPPORT_INVITE_CODE) {
         try {
             const { invite } = await InviteActions.resolveInvite(
@@ -74,7 +73,6 @@ export async function navigateToUpdatesChannel(): Promise<void> {
             console.warn("[Questcord] Failed to resolve invite:", e);
         }
 
-        // Fallback: open invite modal
         openInviteModal(SUPPORT_INVITE_CODE);
     }
 }
@@ -110,6 +108,7 @@ function renderReleaseInline(nodes: ReleaseInlineNode[], keyPrefix: string) {
                         href={node.url}
                         style={{ color: "var(--text-link, #00a8fc)", cursor: "pointer" }}
                         onClick={(e) => {
+                            // open manually, discord's router swallows plain anchor navigation
                             e.preventDefault();
                             window.open(node.url, "_blank");
                         }}

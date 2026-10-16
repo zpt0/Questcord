@@ -16,13 +16,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * A Discord Quest as surfaced by the QuestsStore. Discord's quest payload is
- * loosely shaped and varies between client versions, so most fields are
- * optional and read through safe `?.` access. `Quest.config.application` / root
- * `application` mirror the same app object for defensive fallbacks.
- */
-
 export interface TaskConfig {
     tasks: Record<string, { target: number }>;
 }
@@ -104,8 +97,8 @@ export function isVideoTask(taskType: string): boolean {
     return (QUEST_TASK_TYPES.VIDEO as readonly string[]).includes(taskType);
 }
 
-/** Extract taskConfig from quest with fallback chain */
 export function getTaskConfig(quest: Quest): TaskConfig | null {
+    // discord moved the task config between quest versions; check every known location
     return (
         quest.config?.taskConfig ??
         quest.config?.taskConfigV2 ??
@@ -115,7 +108,6 @@ export function getTaskConfig(quest: Quest): TaskConfig | null {
     );
 }
 
-/** Resolve applicationId from quest with fallback chain */
 export function resolveApplicationId(quest: Quest): string | null {
     return (
         quest.config?.application?.id ??
@@ -128,7 +120,6 @@ export function resolveApplicationId(quest: Quest): string | null {
     );
 }
 
-/** Resolve application name from quest with fallback chain */
 export function resolveApplicationName(quest: Quest): string {
     return (
         quest.config?.application?.name ??
@@ -139,7 +130,6 @@ export function resolveApplicationName(quest: Quest): string {
     );
 }
 
-/** Resolve quest display name with fallback */
 export function getQuestName(quest: Quest, fallback = "Quest"): string {
     return quest.config?.messages?.questName ?? quest.messages?.questName ?? fallback;
 }

@@ -56,6 +56,7 @@ const CUSTOM_SETTINGS: Record<string, any> = {
     pillPadding: ALL_SETTINGS.pillPadding,
 };
 
+// values must match the qc-pos-* classes in ui/pillStyles.ts
 const POSITION_OPTIONS = [
     { label: "Top Left", value: "top-left" },
     { label: "Top Center", value: "top-center" },
@@ -65,6 +66,7 @@ const POSITION_OPTIONS = [
     { label: "Bottom Right", value: "bottom-right" },
 ];
 
+// values are read by the quest runner, keep in sync or heartbeats fall back
 const HEARTBEAT_OPTIONS = [
     { label: "Fast (~1s, previous behaviour)", value: "fast" },
     { label: "Balanced (~20s)", value: "balanced" },
@@ -183,13 +185,6 @@ function SettingColor({
     );
 }
 
-/**
- * Full Questcord settings page. Every option is grouped into a clearly titled
- * section; the options rendered here are hidden from Vencord's generic
- * "Settings" block (see settings.ts), so this page is the single source of
- * truth. Debug/update options intentionally stay in that generic block as the
- * "advanced" tail.
- */
 export function QuestSettings() {
     return (
         <div className={cl("root")}>

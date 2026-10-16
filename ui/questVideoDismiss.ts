@@ -20,13 +20,6 @@ import { LOG_PREFIX } from "../constants";
 import { debugLog, isPluginStopping } from "../core/state";
 import { settings } from "../settings";
 
-/**
- * MutationObserver-only UI helper: automatically dismisses quest promo video
- * popups and mobile QR code modals. The classic DOM button injection
- * ("Auto Complete" / "+ Queue") was replaced by React patch-based components
- * (ui/QuestButton.tsx, ui/QueueButton.tsx).
- */
-
 let questVideoObserver: MutationObserver | null = null;
 
 export function setupQuestVideoAutoDismiss() {
@@ -35,6 +28,7 @@ export function setupQuestVideoAutoDismiss() {
         if (isPluginStopping) return;
         tryDismissQuestVideo();
     });
+    // quest popups mount at varying depths under body, watch the whole subtree
     questVideoObserver.observe(document.body, { childList: true, subtree: true });
 }
 
@@ -51,7 +45,6 @@ export function cleanupQuestVideoDismiss() {
 }
 
 function cleanupInjectedButtons() {
-    // Defensive cleanup for users upgrading from the DOM-injection build.
     try {
         document.querySelectorAll("[data-quest-autocomplete-btn]").forEach((btn) => {
             try {
@@ -92,6 +85,7 @@ function tryDismissQuestVideo() {
                 }
             }
 
+            // discord's popup copy, it changes with releases, so match loosely
             if (
                 text.includes("Continue on your phone") ||
                 text.includes("Scan this QR code") ||

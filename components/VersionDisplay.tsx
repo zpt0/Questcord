@@ -65,6 +65,7 @@ export function VersionDisplay() {
 
             if (comparison > 0) {
                 setUpdateStatus(`Update available: v${latestVersion}`);
+                // defer the modal so it does not open mid-render of the settings pane
                 setTimeout(() => {
                     showUpdateModal(latestVersion, data.body || "No release notes available.");
                 }, 500);
