@@ -4,12 +4,8 @@ export let activeQuests = new Map<string, QuestData>();
 export let progressBars = new Map<string, HTMLElement>();
 export let cleanupFunctions = new Map<string, Array<() => void>>();
 export let isPluginStopping = false;
-export let refreshQuestButtonsRef: (() => void) | null = null;
 export function setPluginStopping(value: boolean) {
     isPluginStopping = value;
-}
-export function setRefreshQuestButtonsRef(fn: (() => void) | null) {
-    refreshQuestButtonsRef = fn;
 }
 export function getProgressBarKey(questId: string, userId: string): string {
     return `${questId}${KEY_SEPARATOR}${userId}`;

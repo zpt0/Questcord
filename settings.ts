@@ -7,12 +7,14 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Display toast notifications for quest events",
         default: true,
+        hidden: true,
     },
     notificationDuration: {
         type: OptionType.SLIDER,
         description: "How long notifications stay on screen (seconds)",
         default: 4,
         markers: [1, 2, 3, 4, 6, 8, 10],
+        hidden: true,
     },
 
     // ── Quest Automation (visible in Vencord settings) ──
@@ -20,22 +22,26 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Automatically resume quest automation after Discord reload",
         default: true,
+        hidden: true,
     },
     showProgressBar: {
         type: OptionType.BOOLEAN,
         description: "Show a progress bar for active quests",
         default: true,
+        hidden: true,
     },
     autoDismissQuestPopups: {
         type: OptionType.BOOLEAN,
         description: "Automatically dismiss quest video and mobile QR code popups",
         default: true,
+        hidden: true,
     },
     autoRestartStalled: {
         type: OptionType.BOOLEAN,
         description:
             "Automatically restart quest automation once when progress stalls (off by default)",
         default: false,
+        hidden: true,
     },
     activityHeartbeat: {
         type: OptionType.SELECT,
@@ -46,6 +52,7 @@ export const settings = definePluginSettings({
             { label: "Official pace (~60s)", value: "official" },
         ],
         default: "fast",
+        hidden: true,
     },
     queueEnabled: {
         type: OptionType.BOOLEAN,
