@@ -18,6 +18,7 @@ This plugin operates within the Discord client via Vencord. Potential security c
 ## Update check
 
 The plugin asks the GitHub releases API for the newest version (`api.github.com/repos/zpt0/Questcord/releases`) and shows an in-app notice when a newer one exists. The request sends nothing about you and no token. Only the latest release is supported, so please update before reporting.
+
 ## Best Practices
 
 - Never share your Discord authentication token with anyone
