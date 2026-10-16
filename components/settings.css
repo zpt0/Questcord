@@ -70,6 +70,28 @@
     margin: 0 0 8px 0;
 }
 
+/* Toggle Rows (label left, switch right) */
+.vc-questcord-settings-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.vc-questcord-settings-toggle-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+/* Compact multi-column colour pickers */
+.vc-questcord-settings-color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0 20px;
+}
+
 /* Color Row (label + color picker side by side) */
 .vc-questcord-settings-color-row {
     display: flex;

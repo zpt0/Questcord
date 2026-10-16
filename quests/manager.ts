@@ -3,13 +3,7 @@ import { UserStore } from "@webpack/common";
 import { LOG_PREFIX, SAVED_QUESTS_KEY } from "../constants";
 import { accountReady, getOwner, keyFor, loadOwned } from "../core/account";
 import { settings } from "../settings";
-import {
-    activeQuests,
-    cleanupFunctions,
-    debugLog,
-    getProgressBarKey,
-    refreshQuestButtonsRef,
-} from "../core/state";
+import { activeQuests, cleanupFunctions, debugLog, getProgressBarKey } from "../core/state";
 import { suppressConsole, restoreConsole } from "../core/utils";
 import { QuestsStore } from "../core/stores";
 import { discordApiGet, rateLimitedPost } from "../core/api";
@@ -66,6 +60,24 @@ export function isRunning(questId: string): boolean {
     return false;
 }
 
+/** True when any quest session is currently processing (used by the smart quest button). */
+export function isAnyRunning(): boolean {
+    for (const data of activeQuests.values()) {
+        if (data.isProcessing) return true;
+    }
+    return false;
+}
+
+/** Progress percent (0-100) of a currently running quest, or null when not running. */
+export function getRunningPercent(questId: string): number | null {
+    for (const data of activeQuests.values()) {
+        if (data.questId === questId && data.isProcessing && data.targetProgress > 0) {
+            return Math.min(100, Math.round((data.lastProgress / data.targetProgress) * 100));
+        }
+    }
+    return null;
+}
+
 export function resetResume() {
     autoStartedQuests.clear();
 }
@@ -102,11 +114,6 @@ export function cleanupQuest(questId: string, userId: string) {
         console.warn(`${LOG_PREFIX} Failed to remove saved state:`, e);
     });
     emitSessionEnded(questId);
-    setTimeout(() => {
-        if (refreshQuestButtonsRef) {
-            refreshQuestButtonsRef();
-        }
-    }, 100);
 }
 export function cancelQuest(questId: string, userId: string) {
     const key = getProgressBarKey(questId, userId);
