@@ -9,8 +9,23 @@ updates:
           - "dependencies"
       assignees:
           - "zpt0"
-      open-pull-requests-limit: 5
+      # Never open more than one version-update PR: every dependency of this
+      # ecosystem is bundled into the single "all-dependencies" group below.
+      open-pull-requests-limit: 1
       groups:
-          dev-dependencies:
+          # All version updates land in one pull request.
+          all-dependencies:
+              applies-to: version-updates
               patterns:
                   - "*"
+          # All security updates land in one pull request.
+          all-security-updates:
+              applies-to: security-updates
+              patterns:
+                  - "*"
+      ignore:
+          # typescript-eslint's peer range is `typescript >=4.8.4 <6.1.0`, so a
+          # TypeScript major bump (e.g. 7.x) would only produce a red CI run.
+          - dependency-name: "typescript"
+            update-types:
+                - "version-update:semver-major"
