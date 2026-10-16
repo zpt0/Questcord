@@ -1,3 +1,21 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { rateLimitedPost } from "../core/api";
 import { LOG_PREFIX } from "../constants";
 import { activeQuests, debugLog, getProgressBarKey, isPluginStopping } from "../core/state";
@@ -9,8 +27,7 @@ import { cleanupQuest } from "./manager";
 import { initializeQuestProgressBar } from "./questProgress";
 
 const MAX_VIDEO_ITERATIONS = 3600;
-// Internal budgets (not user-configurable): each progress post is retried a
-// few times, and only sustained failures abort the quest.
+
 const VIDEO_POST_ATTEMPTS = 3;
 const VIDEO_POST_RETRY_BASE_MS = 2000;
 const MAX_CONSECUTIVE_VIDEO_ERRORS = 10;
@@ -35,6 +52,7 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
         return true;
     }
     let secondsDone = quest.userStatus?.progress?.[taskName]?.value ?? 0;
+    // discord only credits progress near real elapsed time; trickle it in small steps
     const maxFuture = 10;
     const speed = 7;
     const interval = 1;
@@ -128,6 +146,7 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
             await new Promise((resolve) => setTimeout(resolve, interval * 1000));
         }
         if (!completed) {
+            // force a final report so the server records completion even if the loop exited early
             try {
                 await postProgress(secondsNeeded);
             } catch (e) {

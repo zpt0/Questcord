@@ -1,3 +1,21 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { LOG_PREFIX } from "../constants";
 import {
     activeQuests,
@@ -31,7 +49,6 @@ export interface DesktopQuestConfig {
     getProgressFromHeartbeat: (data: any, lastFallback: number) => number;
 }
 
-// Internal budgets (not user-configurable).
 const DESKTOP_MODULE_LOOKUP_ATTEMPTS = 3;
 const DESKTOP_MODULE_LOOKUP_RETRY_MS = 2000;
 const DESKTOP_MAX_RUNTIME_BUFFER_MS = 15 * 60 * 1000;
@@ -78,6 +95,7 @@ export async function completeDesktopQuest(
                 let modules: any[] | null = null;
                 let storeLocal: any = null;
                 let FluxDispatcherLocal: any = null;
+                // webpack can still be settling right after startup, so retry the lookup
                 for (let attempt = 0; attempt < DESKTOP_MODULE_LOOKUP_ATTEMPTS; attempt++) {
                     modules = getWebpackModules();
                     if (modules && modules.length > 0) {
@@ -115,6 +133,7 @@ export async function completeDesktopQuest(
 
                 let lastServerProgress = currentProgress;
                 const startTime = Date.now();
+                // extra slack past the target; server-side progress can lag what we spoof
                 const maxRuntimeMs = secondsNeeded * 1000 + DESKTOP_MAX_RUNTIME_BUFFER_MS;
 
                 const updateTicker = setInterval(() => {

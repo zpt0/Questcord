@@ -93,6 +93,10 @@ git clone https://github.com/zpt0/Questcord.git
   </a>
 </p>
 
+<h2 align="center">Credits</h2>
+
+<p align="center">The Discord UI patches were originally ported from <a href="https://github.com/BlockTol/Quest-Auto-Complete">BlockTol/Quest-Auto-Complete</a> (GPL-3.0).</p>
+
 <h2 align="center">Support</h2>
 
 <p align="center">

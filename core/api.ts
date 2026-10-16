@@ -1,9 +1,28 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { findByPropsLazy } from "@webpack";
 import { LOG_PREFIX } from "../constants";
 const AuthStore = findByPropsLazy("getToken");
 export function getDiscordToken(): string {
     try {
         const token = AuthStore?.getToken?.();
+        // tokens are always long; a short value means the store isn't ready
         if (typeof token === "string" && token.length > 50) {
             return token;
         }
@@ -20,7 +39,6 @@ interface ApiError extends Error {
     retryAfter?: number;
 }
 
-// ── Retry policy (internal, fixed limits — no user settings) ──
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 2000;
 const MAX_RATE_LIMIT_DELAY_MS = 15000;
@@ -45,6 +63,7 @@ function parseRetryAfterMs(response: Response): number | null {
 }
 
 function getErrorStatus(error: any): number | undefined {
+    // fetch errors carry status directly; discord's client nests it under response
     return error?.status ?? error?.response?.status;
 }
 
@@ -63,7 +82,7 @@ interface RetryDecision {
 
 function decideRetry(error: any, attempt: number, maxRetries: number): RetryDecision {
     const status = getErrorStatus(error);
-    // 4xx (except 429) and auth errors are never retried
+
     if (status != null && status < 500 && status !== 429) {
         return { shouldRetry: false, waitMs: 0, reason: "" };
     }

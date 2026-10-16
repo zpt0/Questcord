@@ -1,3 +1,21 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { React, ReactDOM } from "@webpack/common";
 
 function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
@@ -226,11 +244,11 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                             borderRadius: 12,
                             padding: 12,
                             boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                            // max int32 so the popover beats every discord overlay
                             zIndex: 2147483647,
                             width: 240,
                         }}
                     >
-                        {/* Saturation/Value Panel */}
                         <div
                             ref={panelRef}
                             onMouseDown={handlePanelDown}
@@ -264,7 +282,6 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                             />
                         </div>
 
-                        {/* Hue Slider */}
                         <div
                             ref={hueRef}
                             onMouseDown={handleHueDown}
@@ -299,7 +316,6 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                             />
                         </div>
 
-                        {/* RGB Inputs */}
                         <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
                             {(
                                 [
@@ -356,7 +372,6 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                             ))}
                         </div>
 
-                        {/* Hex Input */}
                         <input
                             type="text"
                             value={hexInput}

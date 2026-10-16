@@ -1,3 +1,21 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { findByPropsLazy, findStoreLazy } from "@webpack";
 import { debugLog } from "./state";
 import { suppressConsole, restoreConsole } from "./utils";
@@ -12,6 +30,7 @@ function getWebpackRequire(): any {
     try {
         const webpackChunk = (window as any).webpackChunkdiscord_app;
         if (!webpackChunk) return null;
+        // push/pop a dummy chunk to grab webpack's require; discord exposes no handle
         const wpRequire = webpackChunk.push([[Symbol()], {}, (req: any) => req]);
         webpackChunk.pop();
         return wpRequire;
@@ -50,6 +69,8 @@ export function initializeStores(): boolean {
                 if ((c.getQuest || c.__proto__?.getQuest) && isFluxStore(c)) {
                     const origConsole = suppressConsole("warn");
                     try {
+                        // unrelated modules answer getQuest("1") with an i18n ast stub,
+                        // so only accept candidates that don't come back with one
                         const q = c.getQuest?.("1");
                         if (!q || (!q.locale && !q.ast)) {
                             QuestsStore = c;

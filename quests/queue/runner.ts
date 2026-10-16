@@ -1,3 +1,21 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { LOG_PREFIX } from "../../constants";
 import { accountReady } from "../../core/account";
 import { debugLog } from "../../core/state";
@@ -17,7 +35,6 @@ import {
 } from "../manager";
 import {
     describeEntry,
-    getQuestName as getName,
     pickNext,
     pickToAccept,
     type QueuePreference,
@@ -36,17 +53,14 @@ import {
 } from "./store";
 
 const SETTLE_MS = 1500;
+// space out enroll calls or discord rate limits the whole queue
 const ACCEPT_SPACING_MS = 2000;
-// "Now running" toast is skipped when the run follows a manual queue add
-// within this window — the "added" toast already confirmed the action.
-export const NOW_RUNNING_SUPPRESS_MS = 5000;
 
 let active = false;
 let busy = false;
 let accepting = false;
 let hadWork = false;
 let acceptPausedUntil = 0;
-let lastManualAddAt = 0;
 const pausedIds = new Set<string>();
 let pending: ReturnType<typeof setTimeout> | undefined;
 let unsubscribers: Array<() => void> = [];
@@ -92,13 +106,12 @@ export function setQueueEnabled(enabled: boolean) {
     clearTimeout(pending);
     for (const row of getRows()) {
         if (row.state !== "running" || !isAutoStarted(row.entry.questId)) continue;
+        // flag as paused so the session-end handler keeps it queued instead of dropping it
         pausedIds.add(row.entry.questId);
         try {
             const userId = UserStore.getCurrentUser()?.id;
             if (userId) cancelQuest(row.entry.questId, userId);
-        } catch {
-            // Fallback: cancel via running entry lookup happens on next tick.
-        }
+        } catch {}
         pausedIds.delete(row.entry.questId);
     }
 }
@@ -154,9 +167,6 @@ async function tick() {
             return;
         }
         hadWork = true;
-        if (Date.now() - lastManualAddAt > NOW_RUNNING_SUPPRESS_MS) {
-            notify("Queue", `Now running: ${getName(next.quest!)}`, "info");
-        }
         const result = await startQuest(next.entry.questId, {
             toggle: false,
             prompt: false,
@@ -193,7 +203,6 @@ export async function startQueue() {
 export function stopQueue() {
     active = false;
     pausedIds.clear();
-    lastManualAddAt = 0;
     clearTimeout(pending);
     unsubscribers.forEach((u) => {
         try {
@@ -207,10 +216,9 @@ export function toggleQueued(questId: string, quest?: Quest) {
     const name = quest ? getQuestName(quest) : questId;
     if (isQueued(questId)) {
         removeFromQueue(questId);
-        notify("Queue", `${name} removed`, "info");
+        debugLog(`${LOG_PREFIX} Unqueued ${name}`);
         return;
     }
     addToQueue(questId);
-    lastManualAddAt = Date.now();
-    notify("Queue", `${name} added`, "info");
+    debugLog(`${LOG_PREFIX} Queued ${name}`);
 }

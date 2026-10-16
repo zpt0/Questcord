@@ -1,10 +1,27 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 .vc-questcord-settings-root {
     display: flex;
     flex-direction: column;
     gap: 0.5em;
 }
 
-/* Version Display */
 .vc-questcord-settings-version-container {
     display: flex;
     align-items: center;
@@ -61,7 +78,6 @@
     cursor: not-allowed;
 }
 
-/* Settings Items */
 .vc-questcord-settings-setting-item {
     margin-bottom: 16px;
 }
@@ -70,7 +86,26 @@
     margin: 0 0 8px 0;
 }
 
-/* Color Row (label + color picker side by side) */
+.vc-questcord-settings-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.vc-questcord-settings-toggle-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.vc-questcord-settings-color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0 20px;
+}
+
 .vc-questcord-settings-color-row {
     display: flex;
     align-items: center;
@@ -94,7 +129,7 @@
     margin: 0;
 }
 
-/* Animations */
+/* referenced by the quest conflict modal in ui/modals.ts, keep the name */
 @keyframes fadeIn {
     from {
         opacity: 0;
