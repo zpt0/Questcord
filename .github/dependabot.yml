@@ -29,3 +29,20 @@ updates:
           - dependency-name: "typescript"
             update-types:
                 - "version-update:semver-major"
+
+    - package-ecosystem: "github-actions"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+          day: "monday"
+      labels:
+          - "dependencies"
+      assignees:
+          - "zpt0"
+      # Same deal as npm: one pull request for all action bumps. The actions are
+      # pinned to commit SHAs, Dependabot updates the SHA and the trailing comment.
+      open-pull-requests-limit: 1
+      groups:
+          all-actions:
+              patterns:
+                  - "*"
