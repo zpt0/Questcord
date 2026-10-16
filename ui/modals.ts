@@ -82,7 +82,7 @@ export function showQuestConflictModal(
                     return '<div style="padding: 16px; color: #b9bbbe; text-align: center;">Quest card not available</div>';
                 const clone = tile.cloneNode(true) as HTMLElement;
                 clone
-                    .querySelectorAll('button, [role="button"], [data-quest-autocomplete-btn]')
+                    .querySelectorAll('button, [role="button"], [data-questcord-btn]')
                     .forEach((el) => el.remove());
                 clone.style.pointerEvents = "none";
                 // the 117.6%/-15% below cancel this scale, they are 1/0.85

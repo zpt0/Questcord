@@ -11,10 +11,10 @@
     <img src="https://img.shields.io/github/actions/workflow/status/zpt0/Questcord/ci.yml?branch=main&style=flat-square&logo=github&label=CI" alt="CI"/>
   </a>
   <a href="https://github.com/zpt0/Questcord/releases">
-    <img src="https://img.shields.io/github/v/release/zpt0/Questcord?style=flat-square&logo=github" alt="Release"/>
+    <img src="https://badgen.net/github/tag/zpt0/Questcord?icon=github&label=release" alt="Release"/>
   </a>
   <a href="https://github.com/zpt0/Questcord/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/zpt0/Questcord?style=flat-square" alt="License"/>
+    <img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square" alt="License"/>
   </a>
   <a href="https://discord.gg/MKU8zvHBBJ">
     <img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"/>
