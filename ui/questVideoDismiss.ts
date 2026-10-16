@@ -46,7 +46,7 @@ export function cleanupQuestVideoDismiss() {
 
 function cleanupInjectedButtons() {
     try {
-        document.querySelectorAll("[data-quest-autocomplete-btn]").forEach((btn) => {
+        document.querySelectorAll("[data-questcord-btn]").forEach((btn) => {
             try {
                 btn.remove();
             } catch {}
