@@ -1,12 +1,32 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import "./settings.css";
+import { Switch } from "@components/Switch";
 import { classNameFactory } from "@utils/css";
 import { Forms, Select, Slider } from "@webpack/common";
+
+import { clearSavedQuestStates } from "../quests/manager";
 import { settings } from "../settings";
-import { VersionDisplay } from "./VersionDisplay";
+import { notify } from "../ui/notifications";
 import { ColorPicker } from "./ColorPicker";
 import { QueueSettings } from "./QueueSettings";
-import { clearSavedQuestStates } from "../quests/manager";
-import { notify } from "../ui/notifications";
+import { VersionDisplay } from "./VersionDisplay";
 
 const cl = classNameFactory("vc-questcord-settings-");
 
@@ -36,6 +56,7 @@ const CUSTOM_SETTINGS: Record<string, any> = {
     pillPadding: ALL_SETTINGS.pillPadding,
 };
 
+// values must match the qc-pos-* classes in ui/pillStyles.ts
 const POSITION_OPTIONS = [
     { label: "Top Left", value: "top-left" },
     { label: "Top Center", value: "top-center" },
@@ -45,6 +66,13 @@ const POSITION_OPTIONS = [
     { label: "Bottom Right", value: "bottom-right" },
 ];
 
+// values are read by the quest runner, keep in sync or heartbeats fall back
+const HEARTBEAT_OPTIONS = [
+    { label: "Fast (~1s, previous behaviour)", value: "fast" },
+    { label: "Balanced (~20s)", value: "balanced" },
+    { label: "Official pace (~60s)", value: "official" },
+];
+
 function SettingSlider({
     settingKey,
     label,
@@ -52,6 +80,7 @@ function SettingSlider({
     min,
     max,
     markers,
+    unit = "px",
 }: {
     settingKey: string;
     label: string;
@@ -59,6 +88,7 @@ function SettingSlider({
     min: number;
     max: number;
     markers?: number[];
+    unit?: string;
 }) {
     const value = settings.use([settingKey as any])[settingKey];
     return (
@@ -71,8 +101,34 @@ function SettingSlider({
                 minValue={min}
                 maxValue={max}
                 markers={markers}
-                onValueRender={(v: number) => `${v}${label.includes("Opacity") ? "%" : "px"}`}
+                onValueRender={(v: number) => `${v}${unit}`}
             />
+        </div>
+    );
+}
+
+function SettingToggle({
+    settingKey,
+    label,
+    note,
+}: {
+    settingKey: string;
+    label: string;
+    note?: string;
+}) {
+    const value = settings.use([settingKey as any])[settingKey];
+    return (
+        <div className={cl("setting-item")}>
+            <div className={cl("toggle-row")}>
+                <div className={cl("toggle-label")}>
+                    <Forms.FormTitle style={{ marginBottom: 0 }}>{label}</Forms.FormTitle>
+                    {note && <Forms.FormText>{note}</Forms.FormText>}
+                </div>
+                <Switch
+                    checked={!!value}
+                    onChange={(checked: boolean) => (settings.store[settingKey] = checked)}
+                />
+            </div>
         </div>
     );
 }
@@ -133,9 +189,56 @@ export function QuestSettings() {
     return (
         <div className={cl("root")}>
             <VersionDisplay />
+
             <QueueSettings />
 
-            <Forms.FormSection title="Pill Position">
+            <Forms.FormSection title="Notifications">
+                <SettingToggle
+                    settingKey="showNotifications"
+                    label="Show notifications"
+                    note="Toast notifications for quest events"
+                />
+                <SettingSlider
+                    settingKey="notificationDuration"
+                    label="Notification duration"
+                    note="How long notifications stay on screen"
+                    min={1}
+                    max={10}
+                    markers={[1, 2, 3, 4, 6, 8, 10]}
+                    unit="s"
+                />
+            </Forms.FormSection>
+
+            <Forms.FormSection title="Automation">
+                <SettingToggle
+                    settingKey="autoResumeAfterReload"
+                    label="Resume after reload"
+                    note="Continue unfinished quest automation after Discord reloads"
+                />
+                <SettingToggle
+                    settingKey="showProgressBar"
+                    label="Show progress bar"
+                    note="Display a progress bar for active quests"
+                />
+                <SettingToggle
+                    settingKey="autoDismissQuestPopups"
+                    label="Dismiss quest popups"
+                    note="Automatically close quest video and mobile QR code popups"
+                />
+                <SettingToggle
+                    settingKey="autoRestartStalled"
+                    label="Restart when stalled"
+                    note="Restart quest automation once when progress stops (off by default)"
+                />
+                <SettingSelect
+                    settingKey="activityHeartbeat"
+                    label="Activity heartbeat"
+                    note="How often activity quests report progress (slower is safer on rate limits)"
+                    options={HEARTBEAT_OPTIONS}
+                />
+            </Forms.FormSection>
+
+            <Forms.FormSection title="Pill position">
                 <SettingSelect
                     settingKey="pillPosition"
                     label="Position"
@@ -144,40 +247,42 @@ export function QuestSettings() {
                 />
             </Forms.FormSection>
 
-            <Forms.FormSection title="Colors">
-                <SettingColor
-                    settingKey="pillBgColor"
-                    label="Background"
-                    note="Pill background color"
-                />
-                <SettingColor
-                    settingKey="pillAccentColor"
-                    label="Accent"
-                    note="Progress bars, spinners, highlights"
-                />
-                <SettingColor
-                    settingKey="pillTextColor"
-                    label="Text"
-                    note="Pill title text color"
-                />
-                <SettingColor
-                    settingKey="pillPercentColor"
-                    label="Percent"
-                    note="Progress percent text color"
-                />
-                <SettingColor
-                    settingKey="pillBarBgColor"
-                    label="Bar Background"
-                    note="Progress bar track color"
-                />
-                <SettingColor
-                    settingKey="pillBorderColor"
-                    label="Border"
-                    note="Pill border color"
-                />
+            <Forms.FormSection title="Pill colors">
+                <div className={cl("color-grid")}>
+                    <SettingColor
+                        settingKey="pillBgColor"
+                        label="Background"
+                        note="Pill background color"
+                    />
+                    <SettingColor
+                        settingKey="pillAccentColor"
+                        label="Accent"
+                        note="Progress bars, spinners, highlights"
+                    />
+                    <SettingColor
+                        settingKey="pillTextColor"
+                        label="Text"
+                        note="Pill title text color"
+                    />
+                    <SettingColor
+                        settingKey="pillPercentColor"
+                        label="Percent"
+                        note="Progress percent text color"
+                    />
+                    <SettingColor
+                        settingKey="pillBarBgColor"
+                        label="Bar Background"
+                        note="Progress bar track color"
+                    />
+                    <SettingColor
+                        settingKey="pillBorderColor"
+                        label="Border"
+                        note="Pill border color"
+                    />
+                </div>
             </Forms.FormSection>
 
-            <Forms.FormSection title="Appearance">
+            <Forms.FormSection title="Pill appearance">
                 <SettingSlider
                     settingKey="pillBorderRadius"
                     label="Corner Radius"
@@ -201,6 +306,7 @@ export function QuestSettings() {
                     min={50}
                     max={100}
                     markers={[50, 60, 70, 80, 85, 90, 95, 100]}
+                    unit="%"
                 />
                 <SettingSlider
                     settingKey="pillPadding"

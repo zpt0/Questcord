@@ -13,6 +13,7 @@
         "types": ["node"],
         "paths": {
             "@api/*": ["./stubs/api/*"],
+            "@components/*": ["./stubs/components/*"],
             "@utils/*": ["./stubs/utils/*"],
             "@webpack/*": ["./stubs/webpack/*"],
             "@webpack": ["./stubs/webpack/index.d.ts"],

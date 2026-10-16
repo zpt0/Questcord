@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.4.0]
+
+- Redesigned quest tile buttons: the separate "Auto Complete" and "+ Queue" buttons are merged into a single smart button (two buttons per quest tile, stacked like Discord's own button above ours)
+- The smart button adapts its label automatically: `Cancel` while the quest runs, `Queued ✓` when it is queued, `Start quest first` when the quest has not been accepted yet, `Add to queue` as soon as any quest is running/queued, otherwise `Auto Complete`
+- Quests no longer have to be accepted first — queueing a not-yet-accepted quest auto-accepts it
+- New "Queue (N)" button above the quest list (next to Suggested/Filters) that opens a queue panel with the enable switch, priority picker (Videos/Games first), the full queue list with per-entry status/remove, and Clear Queue; the button only appears while the queue is not empty
+- Queue toggling is silent now: the "Queue added/removed/Now running" toasts are gone (the button label and header count already confirm the state). Notifications can still be disabled entirely in the plugin settings
+- Notification options (show notifications, duration) are back at the top of the plugin settings
+- Plugin settings page reorganized into clearly titled sections (Queue, Notifications, Automation, Pill position/colors/appearance, Reset); the duplicated Vencord "Settings" tail now only holds the advanced debug/update options
+- Buttons are now injected via Vencord React patches instead of DOM mutation (fixes layout/duplication issues); a right-click context menu entry "Add to queue"/"Remove from queue" was added on quest entries
+- UI labels are English by default and automatically adapt to the Discord client language (German included, other locales fall back to English)
+
+## [1.3.2]
+
+- Dev dependency updates: @types/node 26.6.5, @vitest/coverage-v8 5.0.3, eslint 10.12.0, prettier 3.9.10, typescript 6.0.3, typescript-eslint 8.71.1, vitest 5.0.3
+- TypeScript capped at 6.x (typescript-eslint 8.71.1 peer range is `>=4.8.4 <6.1.0`); the TypeScript 7 major is now ignored by Dependabot so the dependency PR stays green
+- Dependabot now bundles every dependency update into a single pull request
+- No functional changes
+
 ## [1.3.1]
 
 - Fix duplicate "Queue added" bubble: central notification dedup guard suppresses identical notifications fired twice from any source, and the "Now running" toast is skipped when the run directly follows a manual queue add

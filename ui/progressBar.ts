@@ -1,3 +1,21 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { settings } from "../settings";
 import { activeQuests, getProgressBarKey, isPluginStopping, progressBars } from "../core/state";
 import { questTileSelector } from "../core/utils";
@@ -5,6 +23,7 @@ import { updateQuestPill } from "./notifications";
 
 export function getDiscordProgressPercent(questId: string): number | null {
     try {
+        // discord exposes no progress api here, scrape the ring svg it renders
         const questTile = document.querySelector(questTileSelector(questId));
         if (!questTile) return null;
         const allCircles = questTile.querySelectorAll("circle");
@@ -19,6 +38,7 @@ export function getDiscordProgressPercent(questId: string): number | null {
             }
         });
         if (!greenCircle && allCircles.length >= 2) {
+            // fallback when no green stroke is found: the ring is usually the 2nd circle
             greenCircle = allCircles[1];
         }
         if (!greenCircle) return null;
@@ -58,7 +78,7 @@ export function updateProgressBar(questId: string, userId: string, percent: numb
     if (isPluginStopping) return;
     const key = getProgressBarKey(questId, userId);
     const clampedPercent = Math.min(100, Math.max(0, percent));
-    // Always track progress for the stall watchdog, even when the visible bar is disabled.
+
     const questData = activeQuests.get(key);
     if (questData) {
         if (clampedPercent > questData.lastProgress) {

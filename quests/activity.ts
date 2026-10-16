@@ -1,3 +1,21 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { rateLimitedPost } from "../core/api";
 import { LOG_PREFIX } from "../constants";
 import { activeQuests, debugLog, getProgressBarKey, isPluginStopping } from "../core/state";
@@ -11,8 +29,7 @@ import { cleanupQuest } from "./manager";
 import { initializeQuestProgressBar } from "./questProgress";
 
 const MAX_ACTIVITY_ITERATIONS = 3600;
-// Internal budgets (not user-configurable): tolerate transient heartbeat
-// failures with backoff instead of aborting on the first error.
+
 const MAX_CONSECUTIVE_HEARTBEAT_ERRORS = 5;
 const HEARTBEAT_RETRY_BASE_DELAY_MS = 2000;
 const TERMINAL_HEARTBEAT_ATTEMPTS = 3;
@@ -50,10 +67,12 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
             cleanupQuest(quest.id, userId);
             return false;
         }
+        // stream_key shape comes from discord's client; don't simplify it
         const streamKey = `call:${channelId}:1`;
         const key = getProgressBarKey(quest.id, userId);
         const heartbeatMode =
             (settings.store as { activityHeartbeat?: string }).activityHeartbeat ?? "fast";
+        // "official" mirrors discord's real client cadence; faster modes risk rate limits
         const [minInterval, maxInterval] =
             heartbeatMode === "official"
                 ? [58, 62]
@@ -81,6 +100,7 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
                         : 0;
                 updateProgressBar(quest.id, userId, percent);
                 if (progress >= targetNeeded) {
+                    // terminal heartbeat finalizes the quest server-side; it can't be skipped
                     for (let attempt = 0; attempt < TERMINAL_HEARTBEAT_ATTEMPTS; attempt++) {
                         try {
                             await rateLimitedPost(`/quests/${quest.id}/heartbeat`, {

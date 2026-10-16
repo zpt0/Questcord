@@ -1,41 +1,63 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
 
 export const settings = definePluginSettings({
-    // ── Notifications (visible in Vencord settings) ──
     showNotifications: {
         type: OptionType.BOOLEAN,
         description: "Display toast notifications for quest events",
         default: true,
+        hidden: true,
     },
     notificationDuration: {
         type: OptionType.SLIDER,
         description: "How long notifications stay on screen (seconds)",
         default: 4,
         markers: [1, 2, 3, 4, 6, 8, 10],
+        hidden: true,
     },
 
-    // ── Quest Automation (visible in Vencord settings) ──
     autoResumeAfterReload: {
         type: OptionType.BOOLEAN,
         description: "Automatically resume quest automation after Discord reload",
         default: true,
+        hidden: true,
     },
     showProgressBar: {
         type: OptionType.BOOLEAN,
         description: "Show a progress bar for active quests",
         default: true,
+        hidden: true,
     },
     autoDismissQuestPopups: {
         type: OptionType.BOOLEAN,
         description: "Automatically dismiss quest video and mobile QR code popups",
         default: true,
+        hidden: true,
     },
     autoRestartStalled: {
         type: OptionType.BOOLEAN,
         description:
             "Automatically restart quest automation once when progress stalls (off by default)",
         default: false,
+        hidden: true,
     },
     activityHeartbeat: {
         type: OptionType.SELECT,
@@ -46,6 +68,7 @@ export const settings = definePluginSettings({
             { label: "Official pace (~60s)", value: "official" },
         ],
         default: "fast",
+        hidden: true,
     },
     queueEnabled: {
         type: OptionType.BOOLEAN,
@@ -64,21 +87,18 @@ export const settings = definePluginSettings({
         hidden: true,
     },
 
-    // ── Debug (visible in Vencord settings) ──
     debugMode: {
         type: OptionType.BOOLEAN,
         description: "Enable debug logging in the console (useful for troubleshooting)",
         default: false,
     },
 
-    // ── Updates (visible in Vencord settings) ──
     showUpdateNotifications: {
         type: OptionType.BOOLEAN,
         description: "Show notifications when a new version is available",
         default: true,
     },
 
-    // ── Pill Position (custom UI only) ──
     pillPosition: {
         type: OptionType.SELECT,
         description: "Position of quest progress pill overlays",
@@ -94,7 +114,6 @@ export const settings = definePluginSettings({
         hidden: true,
     },
 
-    // ── Pill Colors (custom UI only) ──
     pillBgColor: {
         type: OptionType.STRING,
         description: "Pill background color (hex, e.g. #000000)",
@@ -132,7 +151,6 @@ export const settings = definePluginSettings({
         hidden: true,
     },
 
-    // ── Pill Appearance (custom UI only) ──
     pillBorderRadius: {
         type: OptionType.SLIDER,
         description: "Pill corner roundness (px)",
