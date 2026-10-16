@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.1]
+
+- Release pages now include install instructions (unzip into `src/userplugins/`, rebuild, reload) and always link a correct compare against the previous release
+- Release notes are kept in the repo (`.github/releases/vX.Y.Z.md`) and reviewed with the pull request; a changelog section or the grouped commit list is used as a fallback
+- Prerelease tags (`v1.5.0-rc.1`) are published as a prerelease and never replace the "Latest" release
+- The release archive now contains the plugin as `Questcord/` instead of `Questcord-vX.Y.Z/`, so it no longer has to be renamed after unzipping
+- Dev dependency updates: `@vitest/coverage-v8` 5.0.4 and `typescript-eslint` 8.71.2
+- No plugin changes: the quest automation is unchanged from 1.4.0
+
 ## [1.4.0]
 
 - Redesigned quest tile buttons: the separate "Auto Complete" and "+ Queue" buttons are merged into a single smart button (two buttons per quest tile, stacked like Discord's own button above ours)
