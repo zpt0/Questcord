@@ -92,7 +92,12 @@ jobs:
                   TAG: ${{ steps.tag.outputs.tag }}
                   NOTES_SOURCE: ${{ inputs.notes }}
                   PRERELEASE: ${{ inputs.prerelease }}
-              run: bash .github/releases/generate-notes.sh
+              run: |
+                  if [ ! -f .github/releases/generate-notes.sh ]; then
+                    echo "::error::${TAG} predates the release notes tooling, edit that release on GitHub instead"
+                    exit 1
+                  fi
+                  bash .github/releases/generate-notes.sh
 
             - name: Create GitHub Release
               uses: softprops/action-gh-release@v2
