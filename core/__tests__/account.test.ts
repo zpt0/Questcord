@@ -44,7 +44,7 @@ describe("core/account", () => {
         expect(accountReady()).toBe(false);
         setOwner("user-1", { storeMayBeLoaded: true });
         expect(getOwner()).toBe("user-1");
-        // storeMayBeLoaded + questsLoaded() => ready
+
         expect(accountReady()).toBe(true);
         markQuestsLoaded();
         expect(accountReady()).toBe(true);
@@ -62,7 +62,7 @@ describe("core/account", () => {
         setOwner("u9");
         const loaded = await loadOwned<{ v: number }>("legacy-key");
         expect(loaded).toEqual({ v: 1 });
-        // Migrated to owned key, legacy removed
+
         expect(await DataStore.get("legacy-key:u9")).toEqual({ v: 1 });
         expect(await DataStore.get("legacy-key")).toBeUndefined();
     });

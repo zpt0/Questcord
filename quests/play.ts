@@ -25,6 +25,7 @@ const PLAY_CONFIG: DesktopQuestConfig = {
     progressKey: "PLAY_ON_DESKTOP",
     spoofLabel: "Auto-completing:",
     defaultQuestName: "Play Quest",
+    // minified export names change every build; keep this matcher loose
     getStoreModule: (modules) =>
         modules.find((x: any) => x?.exports?.Ay?.getRunningGames)?.exports?.Ay ||
         modules.find((x: any) => x?.exports?.ZP?.getRunningGames)?.exports?.ZP,

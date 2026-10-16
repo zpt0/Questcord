@@ -38,6 +38,7 @@ export function showQuestConflictModal(
             const newQuestName = newQuest.config?.messages?.questName || "Unknown Quest";
             const runningQuestTile = document.querySelector(questTileSelector(runningQuestId));
             const newQuestTile = document.querySelector(questTileSelector(newQuestId));
+            // openModal is missing on some discord builds, fall back to confirm
             if (!openModal) {
                 const result = confirm(
                     `Quest Already Running\n\n` +
@@ -84,6 +85,7 @@ export function showQuestConflictModal(
                     .querySelectorAll('button, [role="button"], [data-quest-autocomplete-btn]')
                     .forEach((el) => el.remove());
                 clone.style.pointerEvents = "none";
+                // the 117.6%/-15% below cancel this scale, they are 1/0.85
                 clone.style.transform = "scale(0.85)";
                 clone.style.transformOrigin = "top left";
                 clone.style.width = "117.6%";

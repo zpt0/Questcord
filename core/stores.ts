@@ -30,6 +30,7 @@ function getWebpackRequire(): any {
     try {
         const webpackChunk = (window as any).webpackChunkdiscord_app;
         if (!webpackChunk) return null;
+        // push/pop a dummy chunk to grab webpack's require; discord exposes no handle
         const wpRequire = webpackChunk.push([[Symbol()], {}, (req: any) => req]);
         webpackChunk.pop();
         return wpRequire;
@@ -68,6 +69,8 @@ export function initializeStores(): boolean {
                 if ((c.getQuest || c.__proto__?.getQuest) && isFluxStore(c)) {
                     const origConsole = suppressConsole("warn");
                     try {
+                        // unrelated modules answer getQuest("1") with an i18n ast stub,
+                        // so only accept candidates that don't come back with one
                         const q = c.getQuest?.("1");
                         if (!q || (!q.locale && !q.ast)) {
                             QuestsStore = c;

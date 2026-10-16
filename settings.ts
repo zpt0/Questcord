@@ -20,7 +20,6 @@ import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
 
 export const settings = definePluginSettings({
-    // ── Notifications (visible in Vencord settings) ──
     showNotifications: {
         type: OptionType.BOOLEAN,
         description: "Display toast notifications for quest events",
@@ -35,7 +34,6 @@ export const settings = definePluginSettings({
         hidden: true,
     },
 
-    // ── Quest Automation (visible in Vencord settings) ──
     autoResumeAfterReload: {
         type: OptionType.BOOLEAN,
         description: "Automatically resume quest automation after Discord reload",
@@ -89,21 +87,18 @@ export const settings = definePluginSettings({
         hidden: true,
     },
 
-    // ── Debug (visible in Vencord settings) ──
     debugMode: {
         type: OptionType.BOOLEAN,
         description: "Enable debug logging in the console (useful for troubleshooting)",
         default: false,
     },
 
-    // ── Updates (visible in Vencord settings) ──
     showUpdateNotifications: {
         type: OptionType.BOOLEAN,
         description: "Show notifications when a new version is available",
         default: true,
     },
 
-    // ── Pill Position (custom UI only) ──
     pillPosition: {
         type: OptionType.SELECT,
         description: "Position of quest progress pill overlays",
@@ -119,7 +114,6 @@ export const settings = definePluginSettings({
         hidden: true,
     },
 
-    // ── Pill Colors (custom UI only) ──
     pillBgColor: {
         type: OptionType.STRING,
         description: "Pill background color (hex, e.g. #000000)",
@@ -157,7 +151,6 @@ export const settings = definePluginSettings({
         hidden: true,
     },
 
-    // ── Pill Appearance (custom UI only) ──
     pillBorderRadius: {
         type: OptionType.SLIDER,
         description: "Pill corner roundness (px)",

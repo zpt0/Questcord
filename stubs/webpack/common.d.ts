@@ -139,7 +139,6 @@ declare module "@webpack/common" {
         parse(content: string, allowLinks?: boolean): any;
     };
 
-    /** Discord/Vencord popout container (anchor-based flyout panel). */
     const Popout: React.FC<{
         position?: "top" | "bottom" | "left" | "right";
         align?: "top" | "center" | "bottom" | "left" | "right";

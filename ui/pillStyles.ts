@@ -18,6 +18,7 @@
 
 import { settings } from "../settings";
 
+// values must match the qc-pos-* selectors in styles.css
 export const POSITION_CLASSES = [
     "qc-pos-top-left",
     "qc-pos-top-center",

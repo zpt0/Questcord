@@ -53,6 +53,7 @@ import {
 } from "./store";
 
 const SETTLE_MS = 1500;
+// space out enroll calls or discord rate limits the whole queue
 const ACCEPT_SPACING_MS = 2000;
 
 let active = false;
@@ -105,13 +106,12 @@ export function setQueueEnabled(enabled: boolean) {
     clearTimeout(pending);
     for (const row of getRows()) {
         if (row.state !== "running" || !isAutoStarted(row.entry.questId)) continue;
+        // flag as paused so the session-end handler keeps it queued instead of dropping it
         pausedIds.add(row.entry.questId);
         try {
             const userId = UserStore.getCurrentUser()?.id;
             if (userId) cancelQuest(row.entry.questId, userId);
-        } catch {
-            // Fallback: cancel via running entry lookup happens on next tick.
-        }
+        } catch {}
         pausedIds.delete(row.entry.questId);
     }
 }
@@ -212,11 +212,6 @@ export function stopQueue() {
     unsubscribers = [];
 }
 
-/**
- * Add or remove a quest from the queue. Deliberately silent: the tile button
- * label and the header count already confirm the action, and a toast on every
- * click is just noise. Real problems are still reported by the runner.
- */
 export function toggleQueued(questId: string, quest?: Quest) {
     const name = quest ? getQuestName(quest) : questId;
     if (isQueued(questId)) {

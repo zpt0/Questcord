@@ -46,15 +46,14 @@ export async function loadOwned<T>(base: string): Promise<T | undefined> {
     if (!key) return undefined;
     const owned = await DataStore.get<T>(key);
     if (owned !== undefined) return owned;
-    // Migrate legacy global key once.
+
     const legacy = await DataStore.get<T>(base);
+    // owner can switch across the await; re-check before migrating legacy data
     if (legacy === undefined || keyFor(base) !== key) return undefined;
     try {
         await DataStore.set(key, legacy);
         await DataStore.del(base);
-    } catch {
-        // Best effort migration; return legacy value anyway.
-    }
+    } catch {}
     return legacy;
 }
 

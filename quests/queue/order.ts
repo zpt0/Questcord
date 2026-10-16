@@ -47,6 +47,7 @@ export const kindOf = (task: TaskType): QueueKind => (isVideoTask(task) ? "video
 export function pickTask(quest: Quest): TaskType | null {
     const cfg = getTaskConfig(quest);
     if (!cfg?.tasks) return null;
+    // first type that exists wins; ALL_TASK_TYPES order sets the priority
     return ALL_TASK_TYPES.find((t) => cfg.tasks[t] != null) ?? null;
 }
 

@@ -16,12 +16,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * Small UI label localization. Labels are English by default and adapt to the
- * Discord client language via the current user's locale (falls back to English
- * for languages without a dictionary entry).
- */
-
 import { UserStore } from "@webpack/common";
 
 export type UiMessageKey =
@@ -116,16 +110,15 @@ const DEFAULT_MESSAGES: UiMessages = {
     queueAria: "Quest queue",
 };
 
-/** Pure helper: resolve the messages dictionary for a locale ("de", "en-US", ...). */
 export function resolveMessages(locale: string | undefined | null): UiMessages {
     const base = (locale ?? "").split("-")[0].toLowerCase();
     if (base && MESSAGES[base]) {
+        // spread defaults first so a partial translation falls back per key
         return { ...DEFAULT_MESSAGES, ...MESSAGES[base] };
     }
     return DEFAULT_MESSAGES;
 }
 
-/** Testable variant of `t` with an explicit locale. */
 export function translateMessage(
     locale: string | undefined | null,
     key: UiMessageKey,
@@ -138,7 +131,6 @@ export function translateMessage(
     );
 }
 
-/** Discord locale of the current user (e.g. "de", "en-US"). */
 export function getLocale(): string {
     try {
         return UserStore.getCurrentUser()?.locale || DEFAULT_KEY;
@@ -147,7 +139,6 @@ export function getLocale(): string {
     }
 }
 
-/** Localized UI label using the current Discord locale. */
 export function t(key: UiMessageKey, vars?: Record<string, string | number>): string {
     return translateMessage(getLocale(), key, vars);
 }

@@ -25,8 +25,7 @@ import { notify } from "../ui/notifications";
 export const STALL_CHECK_INTERVAL_MS = 60_000;
 export const DEFAULT_STALL_TIMEOUT_MS = 10 * 60_000;
 
-// Internal fixed limit: at most one automatic restart per quest.
-// The on/off toggle lives in settings (default off); the cap itself is not configurable.
+// restart at most once; a repeated stall means discord changed the api, not a transient hang
 export const MAX_STALL_RESTARTS = 1;
 
 let watchdogInterval: ReturnType<typeof setInterval> | null = null;

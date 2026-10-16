@@ -57,16 +57,13 @@ import { settings } from "./settings";
 
 let lateResume: ReturnType<typeof setTimeout> | undefined;
 
+// quest context menu ids, the queue entry is inserted next to them
+// if discord renames them the queue entry silently stops showing up
 const MENU_ANCHORS = ["share-link", "play-game", "display-disclosure"];
 
-/**
- * Vencord mounts its style root (`<vencord-root>`, which holds every managed
- * and core stylesheet) exclusively from a `DOMContentLoaded` listener. When the
- * client is injected after the document already finished loading, that listener
- * never fires and all Vencord CSS - including our `styles.css` - silently stops
- * applying (transparent popouts, unstyled buttons). Re-attach it defensively.
- */
 function ensureStyleRootMounted() {
+    // vencord mounts its style root on DOMContentLoaded only, plugins that start
+    // later would end up unstyled without this
     try {
         const root = document.querySelector("vencord-root");
         if (root && !root.isConnected) document.documentElement.append(root);
@@ -75,7 +72,6 @@ function ensureStyleRootMounted() {
     }
 }
 
-/** Adds "Add to queue"/"Remove from queue" to a quest's context menu. */
 const questMenuPatch: NavContextMenuPatchCallback = (children, props: { quest?: Quest }) => {
     const quest = props?.quest;
     if (!quest || !isQueueable(quest)) return;
@@ -204,6 +200,7 @@ export default definePlugin({
     contextMenus: {
         "quests-entry": questMenuPatch,
     },
+    // the three render helpers below are called from the patch replacements via $self
     renderFooter,
     renderQuestButton,
     renderQueueButton,
@@ -234,6 +231,7 @@ export default definePlugin({
         setPluginStopping(false);
         resetResume();
 
+        // discord fills its quest stores lazily, so the resume check runs staged with retries
         setTimeout(() => {
             if (initializeStores()) {
                 setOwner(currentUserId(), { storeMayBeLoaded: true });
@@ -241,8 +239,6 @@ export default definePlugin({
                 debugLog(`${LOG_PREFIX} Ready!`);
                 void startQueue();
                 setTimeout(() => {
-                    // Skip if account already resolved via flux; checkAndResumeQuests
-                    // self-defers when no owner is set yet.
                     void checkAndResumeQuests()
                         .catch((err) => {
                             console.warn(`${LOG_PREFIX} Resume check failed:`, err);
