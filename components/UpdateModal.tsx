@@ -1,3 +1,21 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { DataStore } from "@api/index";
 import {
     openModal,
@@ -17,6 +35,7 @@ import {
 } from "../constants";
 import { parseReleaseBlocks, parseReleaseInline, type ReleaseInlineNode } from "../core/utils";
 
+// persisted key, renaming it makes old update prompts reappear
 const DISMISSED_KEY = "Questcord-dismissed-version";
 
 export function showUpdateModal(latestVersion: string, releaseNotes: string): void {
@@ -31,7 +50,6 @@ export function showUpdateModal(latestVersion: string, releaseNotes: string): vo
 }
 
 export async function navigateToUpdatesChannel(): Promise<void> {
-    // If we have a channel ID, try to navigate directly
     if (UPDATES_CHANNEL_ID) {
         const channel = ChannelStore.getChannel(UPDATES_CHANNEL_ID);
         if (channel?.guild_id) {
@@ -40,7 +58,6 @@ export async function navigateToUpdatesChannel(): Promise<void> {
         }
     }
 
-    // Try to resolve the invite code to find the guild
     if (SUPPORT_INVITE_CODE) {
         try {
             const { invite } = await InviteActions.resolveInvite(
@@ -56,7 +73,6 @@ export async function navigateToUpdatesChannel(): Promise<void> {
             console.warn("[Questcord] Failed to resolve invite:", e);
         }
 
-        // Fallback: open invite modal
         openInviteModal(SUPPORT_INVITE_CODE);
     }
 }
@@ -92,6 +108,7 @@ function renderReleaseInline(nodes: ReleaseInlineNode[], keyPrefix: string) {
                         href={node.url}
                         style={{ color: "var(--text-link, #00a8fc)", cursor: "pointer" }}
                         onClick={(e) => {
+                            // open manually, discord's router swallows plain anchor navigation
                             e.preventDefault();
                             window.open(node.url, "_blank");
                         }}

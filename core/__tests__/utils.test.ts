@@ -195,7 +195,6 @@ describe("parseReleaseBlocks", () => {
 });
 
 describe("normalizeQuestTileId", () => {
-    // REMOVABLE: LEGACY format tests (pure numeric tile ids).
     describe("legacy", () => {
         it("keeps pure numeric tile ids", () => {
             expect(normalizeQuestTileId("quest-tile-1547360739918880860")).toBe(
@@ -210,7 +209,6 @@ describe("normalizeQuestTileId", () => {
         });
     });
 
-    // REMOVABLE: SUFFIXED format tests (Discord section suffixes).
     describe("suffixed", () => {
         it.each(["featured", "ending-soon", "orb", "new-section-2"])(
             "strips known and future suffix %s",

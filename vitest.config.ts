@@ -11,8 +11,8 @@ export default defineConfig({
         alias: {
             "@api": path.resolve(__dirname, "."),
             "@utils": path.resolve(__dirname, "."),
+            "@webpack/common": path.resolve(__dirname, "vitest-stubs/webpack-common.ts"),
             "@webpack": path.resolve(__dirname, "."),
-            "@webpack/common": path.resolve(__dirname, "."),
         },
     },
 });

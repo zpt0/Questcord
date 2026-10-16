@@ -110,7 +110,7 @@ describe("findStalledQuests", () => {
         expect(onRestart).toHaveBeenCalledTimes(1);
         expect(onRestart).toHaveBeenCalledWith("q1");
         expect(notify).toHaveBeenCalledWith("Restarting Quest", expect.any(String), "info", "q1");
-        // Simulate a fresh entry after the restart stalling again: no second restart.
+
         quest.stallWarned = false;
         quest.lastProgressAt = Date.now() - DEFAULT_STALL_TIMEOUT_MS - 1000;
         expect(checkStallsOnce(DEFAULT_STALL_TIMEOUT_MS, options)).toBe(1);

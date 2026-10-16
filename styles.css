@@ -1,3 +1,21 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 .vc-pill-container {
     position: fixed;
     top: 0;
@@ -11,6 +29,7 @@
     pointer-events: none;
     align-items: center;
     padding: 24px;
+    /* --qc-* are set at runtime by applyPillContainerStyle in pillStyles.ts */
     --qc-accent: #5865f2;
     --qc-bg: #000000;
     --qc-text: #ffffff;
@@ -127,6 +146,7 @@
     max-height: 250px;
 }
 
+/* exit duration must stay <= closePillElement's 900ms delay in notifications.ts */
 .quest-pill.hiding {
     animation: questPillExit 0.8s cubic-bezier(0.5, 0, 0.2, 1) forwards !important;
     pointer-events: none;
@@ -605,8 +625,174 @@
     line-height: 1.3;
 }
 
-[data-questcord-queue-btn] {
-    will-change: transform;
+.vc-questcord-footer {
+    width: 100%;
+}
+
+.vc-questcord-footer-row {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    margin-top: -4px;
+    padding: 0 12px 12px;
+}
+
+.vc-questcord-tile-btn {
+    width: 100%;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vc-questcord-queue-button-anchor {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.vc-questcord-queue-button-anchor button {
+    white-space: nowrap;
+}
+
+.vc-questcord-queue-panel {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: 340px;
+    max-width: calc(100vw - 32px);
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    background: var(--background-surface-higher, var(--background-secondary, #2b2d31));
+    box-shadow: var(--shadow-high, 0 8px 16px rgba(0, 0, 0, 0.24));
+    color: var(--text-default, #f2f3f5);
+}
+
+.vc-questcord-queue-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vc-questcord-queue-head-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.vc-questcord-queue-head-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-strong, var(--header-primary, #f2f3f5));
+}
+
+.vc-questcord-queue-head-status {
+    font-size: 12px;
+    color: var(--text-muted, #b5bac1);
+}
+
+.vc-questcord-queue-heading {
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text-subtle, var(--text-muted, #949ba4));
+}
+
+.vc-questcord-queue-segments {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.vc-questcord-queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.vc-questcord-queue-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.vc-questcord-queue-row:hover {
+    background: var(--background-mod-subtle, rgba(255, 255, 255, 0.06));
+}
+
+.vc-questcord-queue-row-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+}
+
+.vc-questcord-queue-row-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-strong, #f2f3f5);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vc-questcord-queue-row-subtitle {
+    font-size: 12px;
+    color: var(--text-muted, #b5bac1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vc-questcord-queue-row-state {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text-muted, #b5bac1);
+}
+
+.vc-questcord-queue-row-btn {
+    flex-shrink: 0;
+}
+
+.vc-questcord-queue-clear {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.vc-questcord-queue-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 96px;
+    padding: 8px 16px;
+    text-align: center;
+}
+
+.vc-questcord-queue-empty-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-strong, #f2f3f5);
+}
+
+.vc-questcord-queue-empty-hint {
+    font-size: 12px;
+    color: var(--text-muted, #b5bac1);
 }
 
 @media (prefers-reduced-motion: reduce) {

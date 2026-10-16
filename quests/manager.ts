@@ -1,15 +1,27 @@
+/*!
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { DataStore } from "@api/index";
 import { UserStore } from "@webpack/common";
 import { LOG_PREFIX, SAVED_QUESTS_KEY } from "../constants";
 import { accountReady, getOwner, keyFor, loadOwned } from "../core/account";
 import { settings } from "../settings";
-import {
-    activeQuests,
-    cleanupFunctions,
-    debugLog,
-    getProgressBarKey,
-    refreshQuestButtonsRef,
-} from "../core/state";
+import { activeQuests, cleanupFunctions, debugLog, getProgressBarKey } from "../core/state";
 import { suppressConsole, restoreConsole } from "../core/utils";
 import { QuestsStore } from "../core/stores";
 import { discordApiGet, rateLimitedPost } from "../core/api";
@@ -30,11 +42,9 @@ import { completePlayQuest } from "./play";
 import { completeStreamQuest } from "./stream";
 import { completeVideoQuest } from "./video";
 export const SAVED_STATE_KEY = SAVED_QUESTS_KEY;
-// Internal: saved resume entries older than this are discarded.
+
 export const SAVED_STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Queue bookkeeping: which quests were started by the queue (vs manually),
-// plus a lightweight session-ended pub/sub so the queue can dequeue finished quests.
 const autoStartedQuests = new Set<string>();
 type SessionEndListener = (session: { id: string }) => void;
 const sessionEndListeners = new Set<SessionEndListener>();
@@ -64,6 +74,22 @@ export function isRunning(questId: string): boolean {
         if (data.questId === questId && data.isProcessing) return true;
     }
     return false;
+}
+
+export function isAnyRunning(): boolean {
+    for (const data of activeQuests.values()) {
+        if (data.isProcessing) return true;
+    }
+    return false;
+}
+
+export function getRunningPercent(questId: string): number | null {
+    for (const data of activeQuests.values()) {
+        if (data.questId === questId && data.isProcessing && data.targetProgress > 0) {
+            return Math.min(100, Math.round((data.lastProgress / data.targetProgress) * 100));
+        }
+    }
+    return null;
 }
 
 export function resetResume() {
@@ -102,11 +128,6 @@ export function cleanupQuest(questId: string, userId: string) {
         console.warn(`${LOG_PREFIX} Failed to remove saved state:`, e);
     });
     emitSessionEnded(questId);
-    setTimeout(() => {
-        if (refreshQuestButtonsRef) {
-            refreshQuestButtonsRef();
-        }
-    }, 100);
 }
 export function cancelQuest(questId: string, userId: string) {
     const key = getProgressBarKey(questId, userId);
@@ -126,6 +147,7 @@ function getRunningNonVideoQuestId(): string | null {
     }
     return null;
 }
+// discord only tracks one non-video quest at a time; video quests can stack
 function canRunInParallel(newTaskType: string): {
     canRun: boolean;
     conflictQuestId: string | null;
@@ -186,7 +208,6 @@ export async function clearSavedQuestStates() {
 export async function checkAndResumeQuests() {
     if (!settings.store.autoResumeAfterReload) return;
     if (!accountReady() && getOwner() == null) {
-        // Owner not set yet (startup race); caller retries via late resume.
         debugLog(`${LOG_PREFIX} Resume deferred: no account owner yet`);
         return;
     }
@@ -260,7 +281,9 @@ export async function acceptQuestById(questId: string): Promise<{
     retryAt?: number;
 }> {
     try {
+        // location is a discord-defined surface id; changing it breaks enrollment
         await rateLimitedPost(`/quests/${questId}/enroll`, { location: 2 });
+        // store takes a moment to reflect enrollment before callers read it
         await new Promise((r) => setTimeout(r, 1500));
         return { ok: true };
     } catch (e: any) {
