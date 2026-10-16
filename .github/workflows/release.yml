@@ -9,6 +9,18 @@ on:
                 description: "Tag to release (e.g. v1.0.0)"
                 required: true
                 type: string
+            notes:
+                description: "Where the release notes come from"
+                required: false
+                default: auto
+                type: choice
+                options: ["auto", "file", "changelog", "commits"]
+            prerelease:
+                description: "Publish as a prerelease"
+                required: false
+                default: auto
+                type: choice
+                options: ["auto", "true", "false"]
 
 permissions:
     contents: write
@@ -17,10 +29,6 @@ jobs:
     release:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
-
             - name: Resolve tag
               id: tag
               run: |
@@ -29,14 +37,22 @@ jobs:
                   else
                     TAG="${GITHUB_REF#refs/tags/}"
                   fi
+                  VERSION="${TAG#v}"
                   echo "tag=${TAG}" >> $GITHUB_OUTPUT
-                  echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+                  echo "version=${VERSION}" >> $GITHUB_OUTPUT
+                  echo "base_version=${VERSION%%-*}" >> $GITHUB_OUTPUT
+
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  ref: ${{ steps.tag.outputs.tag }}
 
             - name: Validate version match
               run: |
                   TAG_VERSION="${{ steps.tag.outputs.version }}"
+                  BASE_VERSION="${{ steps.tag.outputs.base_version }}"
                   PKG_VERSION=$(node -p "require('./package.json').version")
-                  if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+                  if [ "$TAG_VERSION" != "$PKG_VERSION" ] && [ "$BASE_VERSION" != "$PKG_VERSION" ]; then
                     echo "::error::Tag version ($TAG_VERSION) does not match package.json ($PKG_VERSION)"
                     exit 1
                   fi
@@ -46,7 +62,7 @@ jobs:
               run: |
                   VERSION="${{ steps.tag.outputs.version }}"
                   ZIP_NAME="Questcord-v${VERSION}"
-                  STAGING_DIR="${ZIP_NAME}"
+                  STAGING_DIR="Questcord"
 
                   mkdir -p "${STAGING_DIR}"
 
@@ -70,71 +86,20 @@ jobs:
 
                   echo "zip_name=${ZIP_NAME}.zip" >> $GITHUB_OUTPUT
 
-            - name: Generate release body
-              id: body
-              run: |
-                  TAG="${{ steps.tag.outputs.tag }}"
-
-                  PREV_TAG=$(git tag --sort=-creatordate | grep -A1 "^${TAG}$" | tail -1)
-                  if [ "$PREV_TAG" = "$TAG" ] || [ -z "$PREV_TAG" ]; then
-                    PREV_TAG=""
-                  fi
-
-                   BODY="### What's Changed\n\n"
-                   BODY+="**Changes:**\n\n"
-
-                  if [ -n "$PREV_TAG" ]; then
-                    COMMITS=$(git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s" --no-merges)
-                  else
-                    COMMITS=$(git log "${TAG}" --pretty=format:"- %s" --no-merges)
-                  fi
-                  BODY+="${COMMITS}\n"
-
-                  if [ -n "$PREV_TAG" ]; then
-                    CONTRIBUTORS=$(git log "${PREV_TAG}..${TAG}" --format="%an|%ae" --no-merges \
-                      | grep -viE "^(zpt0|zpt0\.dev|sayrox|ghost)\|" \
-                      | grep -vi "claude" \
-                      | sort -u)
-                  else
-                    CONTRIBUTORS=$(git log "${TAG}" --format="%an|%ae" --no-merges \
-                      | grep -viE "^(zpt0|zpt0\.dev|sayrox|ghost)\|" \
-                      | grep -vi "claude" \
-                      | sort -u)
-                  fi
-
-                  if [ -n "$CONTRIBUTORS" ]; then
-                    BODY+="\n**Thanks to** "
-                    COUNT=$(echo "$CONTRIBUTORS" | wc -l)
-                    i=0
-                    while IFS='|' read -r name email; do
-                      LINK="[${name}](https://github.com/${name})"
-                      i=$((i + 1))
-                      if [ $COUNT -eq 1 ]; then
-                        BODY+="${LINK}"
-                      elif [ $i -eq $COUNT ]; then
-                        BODY+="& ${LINK}"
-                      else
-                        BODY+="${LINK}, "
-                      fi
-                    done <<< "$CONTRIBUTORS"
-                    BODY+=" for contributing!\n"
-                  fi
-
-                  BODY+="\n**Full Changelog**: "
-                  if [ -n "$PREV_TAG" ]; then
-                    BODY+="https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}"
-                  else
-                    BODY+="https://github.com/${{ github.repository }}/releases/tag/${TAG}"
-                  fi
-
-                  echo "body<<EOF" >> $GITHUB_OUTPUT
-                  echo -e "$BODY" >> $GITHUB_OUTPUT
-                  echo "EOF" >> $GITHUB_OUTPUT
+            - name: Generate release notes
+              id: notes
+              env:
+                  TAG: ${{ steps.tag.outputs.tag }}
+                  NOTES_SOURCE: ${{ inputs.notes }}
+                  PRERELEASE: ${{ inputs.prerelease }}
+              run: bash .github/releases/generate-notes.sh
 
             - name: Create GitHub Release
               uses: softprops/action-gh-release@v2
               with:
-                  name: "${{ steps.tag.outputs.tag }}"
-                  body: ${{ steps.body.outputs.body }}
+                  name: ${{ steps.notes.outputs.title }}
+                  body: ${{ steps.notes.outputs.body }}
+                  prerelease: ${{ steps.notes.outputs.prerelease == 'true' }}
+                  make_latest: ${{ steps.notes.outputs.prerelease != 'true' }}
                   files: ${{ steps.build.outputs.zip_name }}
                   tag_name: ${{ steps.tag.outputs.tag }}
