@@ -58,6 +58,7 @@ function getPillContainer(): HTMLElement {
 function closePillElement(el: HTMLElement, delay = 900) {
     if (el.classList.contains("hiding")) return;
     el.classList.add("hiding");
+    // delay must stay >= the questPillExit animation in styles.css
     setTimeout(() => el.remove(), delay);
 }
 
@@ -120,6 +121,7 @@ export function updateQuestPill(questId: string, body?: string, percent?: number
 
     if (percent !== undefined) {
         const floored = Math.floor(percent);
+        // cap below 100 so a filled bar only appears on real completion
         const safePercent = percent >= 100 ? 100 : Math.min(99, Math.max(0, floored));
         const percentEl = pill.querySelector(".quest-pill-percent");
         if (percentEl) percentEl.textContent = `${safePercent}%`;
@@ -237,7 +239,6 @@ function showSubPill(
 ): void {
     const container = getPillContainer();
 
-    // General guard: an identical bubble already on screen is never stacked.
     try {
         const visible = container.querySelectorAll(".quest-sub-pill:not(.hiding)");
         for (const el of Array.from(visible)) {
@@ -248,6 +249,7 @@ function showSubPill(
     } catch {}
 
     const existingPills = container.querySelectorAll(".quest-sub-pill:not(.hiding)");
+    // keep at most 4 sub-pills on screen, drop the oldest
     if (existingPills.length > 4) {
         const oldest = existingPills[0] as HTMLElement;
         closePillElement(oldest, 500);

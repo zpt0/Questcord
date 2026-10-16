@@ -22,7 +22,6 @@
     gap: 0.5em;
 }
 
-/* Version Display */
 .vc-questcord-settings-version-container {
     display: flex;
     align-items: center;
@@ -79,7 +78,6 @@
     cursor: not-allowed;
 }
 
-/* Settings Items */
 .vc-questcord-settings-setting-item {
     margin-bottom: 16px;
 }
@@ -88,7 +86,6 @@
     margin: 0 0 8px 0;
 }
 
-/* Toggle Rows (label left, switch right) */
 .vc-questcord-settings-toggle-row {
     display: flex;
     align-items: center;
@@ -103,14 +100,12 @@
     min-width: 0;
 }
 
-/* Compact multi-column colour pickers */
 .vc-questcord-settings-color-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     gap: 0 20px;
 }
 
-/* Color Row (label + color picker side by side) */
 .vc-questcord-settings-color-row {
     display: flex;
     align-items: center;
@@ -134,7 +129,7 @@
     margin: 0;
 }
 
-/* Animations */
+/* referenced by the quest conflict modal in ui/modals.ts, keep the name */
 @keyframes fadeIn {
     from {
         opacity: 0;

@@ -18,36 +18,24 @@
 
 import { activeQuests, getProgressBarKey } from "./state";
 
-// REMOVABLE: LEGACY quest tiles use `quest-tile-<digits>` with no suffix.
 const LEGACY_QUEST_TILE_BODY_RE = /^\d+$/;
-// REMOVABLE: SUFFIXED quest tiles use `quest-tile-<digits>-<section>`
-// (e.g. -featured, -ending-soon, -orb). Suffix is matched generically so
-// future Discord sections keep working without a whitelist.
+
 const SUFFIXED_QUEST_TILE_BODY_RE = /^(\d+)-[a-z0-9-]+$/i;
 const QUEST_TILE_PREFIX = "quest-tile-";
 
-/**
- * Normalize a quest tile DOM id to the pure numeric quest id.
- * Accepts both legacy (`quest-tile-123`) and suffixed
- * (`quest-tile-123-featured`) formats. Returns null when not parseable.
- * Sync and allocation-light: runs inside the MutationObserver hot path.
- */
+// discord appended a suffix to quest tile ids; accept both the plain and suffixed shapes
 export function normalizeQuestTileId(tileId: string): string | null {
     if (!tileId) return null;
     const raw = tileId.startsWith(QUEST_TILE_PREFIX)
         ? tileId.slice(QUEST_TILE_PREFIX.length)
         : tileId;
-    // REMOVABLE: LEGACY fast path (exact digits, most common).
+
     if (LEGACY_QUEST_TILE_BODY_RE.test(raw)) return raw;
-    // REMOVABLE: SUFFIXED fallback (strip `-section`, keep leading digits).
+
     const m = raw.match(SUFFIXED_QUEST_TILE_BODY_RE);
     return m ? m[1] : null;
 }
 
-/**
- * Build a selector matching a quest tile in both legacy and suffixed form.
- * Single querySelector round, no extra DOM passes.
- */
 export function questTileSelector(questId: string): string {
     if (!LEGACY_QUEST_TILE_BODY_RE.test(questId)) return `[id="quest-tile-${questId}"]`;
     return `[id="quest-tile-${questId}"],[id^="quest-tile-${questId}-"]`;
@@ -55,8 +43,6 @@ export function questTileSelector(questId: string): string {
 
 export type NotificationType = "success" | "info" | "error" | "cancel";
 
-// General anti-duplicate guard: identical notifications fired twice from any
-// source (double observer runs, re-renders, race between systems) only show once.
 export const NOTIFICATION_DEDUP_WINDOW_MS = 1500;
 
 export interface NotificationSignature {
@@ -186,17 +172,11 @@ export type ReleaseBlockNode =
     | { kind: "code"; text: string }
     | { kind: "quote"; lines: string[] };
 
-/** Only http(s) URLs become clickable anchors; everything else stays plain text. */
+// release notes are remote text; only http(s) so javascript:/data: can't be injected
 export function isSafeReleaseUrl(url: string): boolean {
     return /^https?:\/\/[^\s)]+$/i.test(url);
 }
 
-/**
- * Split a single line of GitHub markdown into inline nodes (bold, italic,
- * strikethrough, code spans, links, plain text). Code span content is always
- * literal; everything else recurses so nesting works. The regex is built per
- * call because parsing recurses into itself.
- */
 export function parseReleaseInline(text: string): ReleaseInlineNode[] {
     const tokenRe =
         /(\*\*\*(.+?)\*\*\*)|(\*\*(.+?)\*\*)|(~~(.+?)~~)|(`[^`\n]+`)|(\*([^*\n]+?)\*)|((?<![A-Za-z0-9_])_([^_\n]+?)_(?![A-Za-z0-9_]))|(\[([^\]\n]+)\]\(([^)\s]+)\))|(https?:\/\/[^\s<>\]`]+)/g;
@@ -225,7 +205,6 @@ export function parseReleaseInline(text: string): ReleaseInlineNode[] {
                 nodes.push({ kind: "text", text: match[0] });
             }
         } else if (match[15] !== undefined) {
-            // Bare URL: trim trailing sentence punctuation, keep the rest clickable.
             let url = match[15];
             const trailing = url.match(/[.,;:!?'"]+$/);
             let trail = "";
@@ -241,11 +220,6 @@ export function parseReleaseInline(text: string): ReleaseInlineNode[] {
     return nodes;
 }
 
-/**
- * Split GitHub release notes into block nodes (headings, paragraphs, lists,
- * fenced code blocks, quotes). Horizontal rules are dropped — surrounding
- * spacing stays. Unclosed fences are treated as code to the end.
- */
 export function parseReleaseBlocks(notes: string): ReleaseBlockNode[] {
     const normalized = (notes || "").replace(/\r\n/g, "\n").trim();
     if (!normalized) return [];

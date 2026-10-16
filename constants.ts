@@ -29,7 +29,7 @@ export const UPDATE_CHECK_ENABLED = !!GITHUB_REPO;
 export const UPDATES_CHANNEL_ID = "1532348047697121340";
 export const SUPPORT_INVITE_CODE = "9ra6MwHTHy";
 
-// Per-account DataStore keys (suffixed with `:<userId>` at runtime).
+// persisted DataStore keys; renaming orphans saved quests and queue for every user
 export const SAVED_QUESTS_KEY = "questcord-active-quests";
 export const QUEUE_KEY = "questcord-queue";
 export const QUEUE_ENABLED_KEY = "questcord-queue-enabled";

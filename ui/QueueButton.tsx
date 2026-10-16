@@ -22,13 +22,9 @@ import { getEntries, getVersion, subscribe } from "../quests/queue/store";
 import { QueuePanel } from "./QueuePanel";
 import { t } from "./i18n";
 
-/**
- * Header "Queue (N)" button next to Suggested/Filters on the quests page.
- * Opens a popout with the full queue panel. Hidden while the queue is empty so
- * it does not clutter the quest list.
- */
 export function QueueButton() {
     const anchorRef = React.useRef<HTMLDivElement>(null);
+    // return value unused, this only subscribes so the button re-renders
     React.useSyncExternalStore(subscribe, getVersion);
 
     const count = getEntries().length;

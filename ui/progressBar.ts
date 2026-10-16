@@ -23,6 +23,7 @@ import { updateQuestPill } from "./notifications";
 
 export function getDiscordProgressPercent(questId: string): number | null {
     try {
+        // discord exposes no progress api here, scrape the ring svg it renders
         const questTile = document.querySelector(questTileSelector(questId));
         if (!questTile) return null;
         const allCircles = questTile.querySelectorAll("circle");
@@ -37,6 +38,7 @@ export function getDiscordProgressPercent(questId: string): number | null {
             }
         });
         if (!greenCircle && allCircles.length >= 2) {
+            // fallback when no green stroke is found: the ring is usually the 2nd circle
             greenCircle = allCircles[1];
         }
         if (!greenCircle) return null;
@@ -76,7 +78,7 @@ export function updateProgressBar(questId: string, userId: string, percent: numb
     if (isPluginStopping) return;
     const key = getProgressBarKey(questId, userId);
     const clampedPercent = Math.min(100, Math.max(0, percent));
-    // Always track progress for the stall watchdog, even when the visible bar is disabled.
+
     const questData = activeQuests.get(key);
     if (questData) {
         if (clampedPercent > questData.lastProgress) {

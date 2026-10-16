@@ -25,6 +25,7 @@ const STREAM_CONFIG: DesktopQuestConfig = {
     progressKey: "STREAM_ON_DESKTOP",
     spoofLabel: "Spoofed stream to",
     defaultQuestName: "Stream Quest",
+    // minified names drift per build; also check the prototype, the method isn't an own export
     getStoreModule: (modules) =>
         modules.find((x: any) => x?.exports?.A?.__proto__?.getStreamerActiveStreamMetadata)?.exports
             ?.A ||

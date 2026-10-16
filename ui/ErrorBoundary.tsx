@@ -23,22 +23,8 @@ interface ErrorBoundaryProps {
     children: React.ReactNode;
 }
 
-/**
- * Error boundary for the quest UI injected by this plugin.
- *
- * The class MUST NOT be defined at module scope: Vencord imports userplugins
- * eagerly (`import "~plugins"` at the top of its entry module) and assigns the
- * global `Vencord` object only after that module finished evaluating, while
- * `@webpack/common`'s `React` is itself assigned asynchronously via `waitFor`.
- * A top-level `class ... extends React.Component` therefore runs before React
- * exists, throws, and aborts Vencord's entry module — leaving the global
- * `Vencord` undefined and breaking the whole client.
- *
- * `LazyComponent` defers the class creation to the first render, when React is
- * guaranteed to be available. This mirrors Vencord's own
- * `components/ErrorBoundary`. React is imported from @webpack/common (Vencord
- * bans importing "react").
- */
+// must stay lazy: react from @webpack/common is not ready when this module is evaluated,
+// a module scope component subclass would break the plugin on startup
 export const ErrorBoundary = LazyComponent<ErrorBoundaryProps>(
     () =>
         class ErrorBoundary extends React.Component<ErrorBoundaryProps, { hasError: boolean }> {

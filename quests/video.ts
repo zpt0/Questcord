@@ -27,8 +27,7 @@ import { cleanupQuest } from "./manager";
 import { initializeQuestProgressBar } from "./questProgress";
 
 const MAX_VIDEO_ITERATIONS = 3600;
-// Internal budgets (not user-configurable): each progress post is retried a
-// few times, and only sustained failures abort the quest.
+
 const VIDEO_POST_ATTEMPTS = 3;
 const VIDEO_POST_RETRY_BASE_MS = 2000;
 const MAX_CONSECUTIVE_VIDEO_ERRORS = 10;
@@ -53,6 +52,7 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
         return true;
     }
     let secondsDone = quest.userStatus?.progress?.[taskName]?.value ?? 0;
+    // discord only credits progress near real elapsed time; trickle it in small steps
     const maxFuture = 10;
     const speed = 7;
     const interval = 1;
@@ -146,6 +146,7 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
             await new Promise((resolve) => setTimeout(resolve, interval * 1000));
         }
         if (!completed) {
+            // force a final report so the server records completion even if the loop exited early
             try {
                 await postProgress(secondsNeeded);
             } catch (e) {

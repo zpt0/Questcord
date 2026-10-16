@@ -16,9 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* eslint-disable no-useless-escape -- Vencord patch matchers intentionally
-   use \i which matches Discord's minified identifier placeholders.
- */
+/* eslint-disable no-useless-escape -- the \i placeholder in Discord's minified matchers is intentional */
 
 import type { Quest } from "../core/types";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -26,13 +24,8 @@ import { QuestButton } from "./QuestButton";
 import { QueueButton } from "./QueueButton";
 import { isQueueable } from "../quests/queue/order";
 
-/**
- * React components injected into Discord's quest pages:
- * - Classic quest tile footer (V1): Discord's footer + our smart button below.
- * - Header row (next to Suggested/Filters): the "Queue (N)" popout button.
- * - Newer quest tile footer (V2): smart button inside Discord's footer tree.
- */
 export const questPatches = [
+    // wrap discord's tile footer renderer instead of replacing it, discord's own layout has to stay
     {
         find: ".QUEST_HOME_TILE_FOOTER,analyticsCtxQuestContent",
         replacement: {
@@ -42,6 +35,7 @@ export const questPatches = [
         },
     },
     {
+        // the queue button is injected right after the quest filter pills
         find: /\(0,\i\.jsx\)\(\i,\{onChange:\i,selectedFilters:\i\}\)\]/,
         replacement: {
             match: /(\(0,\i\.jsx\)\(\i,\{onChange:\i,selectedFilters:\i\}\))\]/,
@@ -49,6 +43,7 @@ export const questPatches = [
         },
     },
     {
+        // v2 tiles render their footer separately, so the button is appended after it
         find: ".QUEST_HOME_TILE_V2_FOOTER,analyticsCtxQuestContent",
         noWarn: true,
         replacement: {
@@ -59,6 +54,7 @@ export const questPatches = [
 ] as any[];
 
 export function renderFooter(props: { quest?: Quest }, Footer: React.ComponentType<any>) {
+    // inline styles on purpose: vencord's managed stylesheet may not be mounted yet
     return (
         <div className="vc-questcord-footer" style={{ width: "100%" }}>
             <Footer {...props} />

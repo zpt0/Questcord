@@ -70,6 +70,7 @@ export async function loadQueue() {
     } catch (e) {
         debugLog(`${LOG_PREFIX} Queue load failed:`, e);
     }
+    // account switched while loading; drop it to avoid writing another account's queue
     if (getOwner() !== loadedFor) return;
     entries = loadedEntries;
     enabled = loadedEnabled;

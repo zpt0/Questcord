@@ -26,24 +26,12 @@ import { toggleQueued } from "../quests/queue/runner";
 import { getEntries, getVersion, isQueued, subscribe } from "../quests/queue/store";
 import { t } from "./i18n";
 
-/**
- * Single smart per-quest button (replaces the old "Auto Complete" + "+ Queue"
- * pair). Its label adapts automatically:
- *   running quest           -> Cancel
- *   queued quest            -> Queued ✓
- *   quest not accepted yet  -> Start quest first (click still queues it)
- *   anything running/queued -> Add to queue
- *   otherwise               -> Auto Complete
- *
- * The full width is set inline as well as in styles.css so the button fills
- * the quest tile footer even if the managed stylesheet is not applied.
- */
 export function QuestButton({ quest }: { quest: Quest }) {
-    // Queue state changes (added/removed/enabled) re-render via the store.
     const queueVersion = React.useSyncExternalStore(subscribe, getVersion);
     const preference = (settings.use(["queuePreference" as never]) as { queuePreference?: string })
         .queuePreference;
-    // Running state lives outside the store; poll cheaply while mounted.
+
+    // discord mutates quest progress outside react, so the state has to be polled
     const [, forceTick] = React.useReducer((n: number) => n + 1, 0);
     React.useEffect(() => {
         const interval = setInterval(forceTick, 500);
@@ -61,6 +49,8 @@ export function QuestButton({ quest }: { quest: Quest }) {
     const enrolled = isEnrolled(quest);
     const busy = isAnyRunning() || getEntries().length > 0;
 
+    // one button per tile, the action depends on the state: not accepted quests are still
+    // queueable, the queue accepts them itself once it runs
     let color = Button.Colors.BRAND;
     let label = t("autoComplete");
     let title: string | undefined;
@@ -80,8 +70,6 @@ export function QuestButton({ quest }: { quest: Quest }) {
         title = t("removeFromQueue");
         onClick = () => toggleQueued(questId);
     } else if (!enrolled) {
-        // Not accepted yet: hint that the quest itself needs starting. The
-        // click still queues it - the queue accepts it automatically.
         color = Button.Colors.PRIMARY;
         label = t("startQuestFirst");
         title = t("addToQueue");

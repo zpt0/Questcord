@@ -22,6 +22,7 @@ const AuthStore = findByPropsLazy("getToken");
 export function getDiscordToken(): string {
     try {
         const token = AuthStore?.getToken?.();
+        // tokens are always long; a short value means the store isn't ready
         if (typeof token === "string" && token.length > 50) {
             return token;
         }
@@ -38,7 +39,6 @@ interface ApiError extends Error {
     retryAfter?: number;
 }
 
-// ── Retry policy (internal, fixed limits — no user settings) ──
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 2000;
 const MAX_RATE_LIMIT_DELAY_MS = 15000;
@@ -63,6 +63,7 @@ function parseRetryAfterMs(response: Response): number | null {
 }
 
 function getErrorStatus(error: any): number | undefined {
+    // fetch errors carry status directly; discord's client nests it under response
     return error?.status ?? error?.response?.status;
 }
 
@@ -81,7 +82,7 @@ interface RetryDecision {
 
 function decideRetry(error: any, attempt: number, maxRetries: number): RetryDecision {
     const status = getErrorStatus(error);
-    // 4xx (except 429) and auth errors are never retried
+
     if (status != null && status < 500 && status !== 429) {
         return { shouldRetry: false, waitMs: 0, reason: "" };
     }
