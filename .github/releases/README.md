@@ -39,6 +39,8 @@ For prereleases (`v1.5.0-rc.1`) the base version file (`v1.5.0.md`) is used when
 
 A manual run of the workflow (`workflow_dispatch`) can override the source (`auto`, `file`, `changelog`, `commits`) and whether the release is a prerelease (`auto`, `true`, `false`). In `auto` mode any tag with a suffix (`v1.5.0-rc.1`, `-beta`, `-alpha`) is published as a prerelease and never becomes the "Latest" release.
 
+A manual run builds the tagged tree, so the tag has to contain this tooling. Releases published before the notes moved into the repo are edited on GitHub directly.
+
 ## Testing locally
 
 ```bash
