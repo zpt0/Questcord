@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2]
+
+- Dev dependency updates: @types/node 26.6.5, @vitest/coverage-v8 5.0.3, eslint 10.12.0, prettier 3.9.10, typescript 6.0.3, typescript-eslint 8.71.1, vitest 5.0.3
+- TypeScript capped at 6.x (typescript-eslint 8.71.1 peer range is `>=4.8.4 <6.1.0`); the TypeScript 7 major is now ignored by Dependabot so the dependency PR stays green
+- Dependabot now bundles every dependency update into a single pull request
+- No functional changes
+
 ## [1.3.1]
 
 - Fix duplicate "Queue added" bubble: central notification dedup guard suppresses identical notifications fired twice from any source, and the "Now running" toast is skipped when the run directly follows a manual queue add
