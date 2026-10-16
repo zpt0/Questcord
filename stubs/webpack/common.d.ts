@@ -139,6 +139,18 @@ declare module "@webpack/common" {
         parse(content: string, allowLinks?: boolean): any;
     };
 
+    /** Discord/Vencord popout container (anchor-based flyout panel). */
+    const Popout: React.FC<{
+        position?: "top" | "bottom" | "left" | "right";
+        align?: "top" | "center" | "bottom" | "left" | "right";
+        spacing?: number;
+        targetElementRef?: React.RefObject<any>;
+        renderPopout?: (info?: any) => React.ReactNode;
+        animation?: unknown;
+        LustreAnimation?: unknown;
+        children: (props: Record<string, any>) => React.ReactNode;
+    }>;
+
     export {
         React,
         ReactDOM,
@@ -159,5 +171,6 @@ declare module "@webpack/common" {
         ChannelStore,
         InviteActions,
         Parser,
+        Popout,
     };
 }

@@ -46,7 +46,7 @@ export function isExpired(quest: Quest, now = Date.now()): boolean {
     return new Date(expiresAt).getTime() <= now;
 }
 
-export function isQueueable(quest: Quest, now = Date.now()): boolean {
+export function isQueueable(quest: Quest | undefined, now = Date.now()): boolean {
     if (!quest?.id) return false;
     return pickTask(quest) != null && !isCompleted(quest) && !isExpired(quest, now);
 }

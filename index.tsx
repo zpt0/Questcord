@@ -1,6 +1,8 @@
 import managedStyle from "./styles.css?managed";
 import { DataStore } from "@api/index";
+import { findGroupChildrenByChildId, type NavContextMenuPatchCallback } from "@api/ContextMenu";
 import definePlugin from "@utils/types";
+import { Menu } from "@webpack/common";
 import { QuestSettings } from "./components/Settings";
 import { navigateToUpdatesChannel, showUpdateModal } from "./components/UpdateModal";
 import { PLUGIN_VERSION, UPDATE_CHECK_URL, UPDATE_CHECK_ENABLED, LOG_PREFIX } from "./constants";
@@ -8,6 +10,7 @@ import { compareVersions } from "./core/utils";
 import { initializeStores } from "./core/stores";
 import { getOwner, markQuestsLoaded, setOwner } from "./core/account";
 import { currentUserId } from "./core/user";
+import type { Quest } from "./core/types";
 import {
     activeQuests,
     cleanupFunctions,
@@ -18,7 +21,9 @@ import {
     setPluginStopping,
 } from "./core/state";
 import { cleanupAllPills, notify } from "./ui/notifications";
-import { cleanupQuestButtonObserver, setupQuestButtonObserver } from "./ui/questButtons";
+import { cleanupQuestVideoDismiss, setupQuestVideoAutoDismiss } from "./ui/questVideoDismiss";
+import { questPatches, renderFooter, renderQueueButton, renderQuestButton } from "./ui/patches";
+import { t } from "./ui/i18n";
 import {
     cancelAll,
     cancelQuest,
@@ -26,12 +31,54 @@ import {
     resetResume,
     startQuest,
 } from "./quests/manager";
-import { scheduleTick, startQueue, stopQueue } from "./quests/queue/runner";
-import { unloadQueue } from "./quests/queue/store";
+import { scheduleTick, startQueue, stopQueue, toggleQueued } from "./quests/queue/runner";
+import { isQueueable } from "./quests/queue/order";
+import { isQueued, unloadQueue } from "./quests/queue/store";
 import { DEFAULT_STALL_TIMEOUT_MS, startStallWatchdog, stopStallWatchdog } from "./core/watchdog";
 import { settings } from "./settings";
 
 let lateResume: ReturnType<typeof setTimeout> | undefined;
+
+const MENU_ANCHORS = ["share-link", "play-game", "display-disclosure"];
+
+/**
+ * Vencord mounts its style root (`<vencord-root>`, which holds every managed
+ * and core stylesheet) exclusively from a `DOMContentLoaded` listener. When the
+ * client is injected after the document already finished loading, that listener
+ * never fires and all Vencord CSS - including our `styles.css` - silently stops
+ * applying (transparent popouts, unstyled buttons). Re-attach it defensively.
+ */
+function ensureStyleRootMounted() {
+    try {
+        const root = document.querySelector("vencord-root");
+        if (root && !root.isConnected) document.documentElement.append(root);
+    } catch (err) {
+        console.warn(`${LOG_PREFIX} Could not mount Vencord style root:`, err);
+    }
+}
+
+/** Adds "Add to queue"/"Remove from queue" to a quest's context menu. */
+const questMenuPatch: NavContextMenuPatchCallback = (children, props: { quest?: Quest }) => {
+    const quest = props?.quest;
+    if (!quest || !isQueueable(quest)) return;
+
+    const group = findGroupChildrenByChildId(MENU_ANCHORS, children);
+    if (!group) return;
+
+    const anchorIndex = MENU_ANCHORS.map((id) =>
+        group.findIndex((child: any) => child?.props?.id === id)
+    ).find((index) => index >= 0);
+    const anchor = anchorIndex ?? group.length - 1;
+    group.splice(
+        anchor + 1,
+        0,
+        <Menu.MenuItem
+            id="vc-questcord-queue-toggle"
+            label={isQueued(quest.id) ? t("removeFromQueue") : t("addToQueue")}
+            action={() => toggleQueued(quest.id, quest)}
+        />
+    );
+};
 
 async function checkForUpdates(): Promise<void> {
     if (!UPDATE_CHECK_ENABLED) return;
@@ -117,7 +164,7 @@ function cleanupAll() {
         });
     });
     cleanupFunctions.clear();
-    cleanupQuestButtonObserver();
+    cleanupQuestVideoDismiss();
     cleanupAllPills();
     debugLog(`${LOG_PREFIX} Cleanup completed`);
 }
@@ -135,6 +182,13 @@ export default definePlugin({
     settings,
     managedStyle,
     settingsAboutComponent: () => <QuestSettings />,
+    patches: questPatches,
+    contextMenus: {
+        "quests-entry": questMenuPatch,
+    },
+    renderFooter,
+    renderQuestButton,
+    renderQueueButton,
     flux: {
         LOGOUT() {
             leaveAccount();
@@ -156,6 +210,7 @@ export default definePlugin({
         },
     },
     start() {
+        ensureStyleRootMounted();
         initDebug(settings.store);
         debugLog(`${LOG_PREFIX} Plugin started - v${PLUGIN_VERSION}`);
         setPluginStopping(false);
@@ -164,7 +219,7 @@ export default definePlugin({
         setTimeout(() => {
             if (initializeStores()) {
                 setOwner(currentUserId(), { storeMayBeLoaded: true });
-                setupQuestButtonObserver();
+                setupQuestVideoAutoDismiss();
                 debugLog(`${LOG_PREFIX} Ready!`);
                 void startQueue();
                 setTimeout(() => {
