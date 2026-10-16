@@ -24,6 +24,8 @@ on:
 
 permissions:
     contents: write
+    id-token: write
+    attestations: write
 
 jobs:
     release:
@@ -42,7 +44,7 @@ jobs:
                   echo "version=${VERSION}" >> $GITHUB_OUTPUT
                   echo "base_version=${VERSION%%-*}" >> $GITHUB_OUTPUT
 
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
               with:
                   fetch-depth: 0
                   ref: ${{ steps.tag.outputs.tag }}
@@ -54,6 +56,16 @@ jobs:
                   PKG_VERSION=$(node -p "require('./package.json').version")
                   if [ "$TAG_VERSION" != "$PKG_VERSION" ] && [ "$BASE_VERSION" != "$PKG_VERSION" ]; then
                     echo "::error::Tag version ($TAG_VERSION) does not match package.json ($PKG_VERSION)"
+                    exit 1
+                  fi
+
+            - name: Check the tag is on main
+              env:
+                  TAG: ${{ steps.tag.outputs.tag }}
+              run: |
+                  git fetch --quiet origin "+refs/heads/main:refs/remotes/origin/main"
+                  if ! git merge-base --is-ancestor HEAD refs/remotes/origin/main; then
+                    echo "::error::${TAG} is not on main, refusing to release this tag"
                     exit 1
                   fi
 
@@ -86,6 +98,11 @@ jobs:
 
                   echo "zip_name=${ZIP_NAME}.zip" >> $GITHUB_OUTPUT
 
+            - name: Write checksums
+              run: |
+                  sha256sum "${{ steps.build.outputs.zip_name }}" > SHA256SUMS
+                  cat SHA256SUMS
+
             - name: Generate release notes
               id: notes
               env:
@@ -100,11 +117,18 @@ jobs:
                   bash .github/releases/generate-notes.sh
 
             - name: Create GitHub Release
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
               with:
                   name: ${{ steps.notes.outputs.title }}
                   body: ${{ steps.notes.outputs.body }}
                   prerelease: ${{ steps.notes.outputs.prerelease == 'true' }}
                   make_latest: ${{ steps.notes.outputs.prerelease != 'true' }}
-                  files: ${{ steps.build.outputs.zip_name }}
+                  files: |
+                      ${{ steps.build.outputs.zip_name }}
+                      SHA256SUMS
                   tag_name: ${{ steps.tag.outputs.tag }}
+
+            - name: Attest the release zip
+              uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+              with:
+                  subject-path: ${{ steps.build.outputs.zip_name }}
