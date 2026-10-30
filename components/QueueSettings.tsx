@@ -16,14 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Forms } from "@webpack/common";
-
 import { QueuePanel } from "../ui/QueuePanel";
 
 export function QueueSettings() {
     return (
-        <Forms.FormSection title="Queue">
+        <section title="Queue">
             <QueuePanel inline />
-        </Forms.FormSection>
+        </section>
     );
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.2]
+
+- Fix the build against Vencord 1.15.14: the deprecated `Button` and `Forms` exports were removed from `@webpack/common`
+- Buttons now come from `@components/Button`, using `variant`/`size` instead of `color`/`Button.Colors`/`Button.Sizes`
+- Settings titles and notes use Vencord's `Heading` and `Paragraph` instead of `Forms.FormTitle`/`Forms.FormText`
+- Sections now render as plain `<section>` elements (`Forms.FormSection` was already only a shim)
+- No functional changes: quest automation, queue and progress pills are unchanged from 1.4.1
+
 ## [1.4.1]
 
 - Release pages now include install instructions (unzip into `src/userplugins/`, rebuild, reload) and always link a correct compare against the previous release

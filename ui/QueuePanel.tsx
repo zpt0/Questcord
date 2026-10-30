@@ -16,8 +16,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { Button } from "@components/Button";
 import { Switch } from "@components/Switch";
-import { Button, React, UserStore } from "@webpack/common";
+import { React, UserStore } from "@webpack/common";
 
 import { getQuestName } from "../core/types";
 import { cancelQuest, getRunningPercent } from "../quests/manager";
@@ -79,8 +80,8 @@ function QueueRowView({ row, enabled }: { row: QueueRow; enabled: boolean }) {
             <span className="vc-questcord-queue-row-state">{stateOf(row, enabled)}</span>
             <Button
                 className="vc-questcord-queue-row-btn"
-                size={Button.Sizes.SMALL}
-                color={running ? Button.Colors.RED : Button.Colors.PRIMARY}
+                size="small"
+                variant={running ? "dangerPrimary" : "secondary"}
                 aria-label={running ? t("cancel") : t("remove")}
                 onClick={() => {
                     if (running) {
@@ -193,12 +194,8 @@ export function QueuePanel({ inline = false }: { inline?: boolean } = {}) {
                     return (
                         <Button
                             key={option.value}
-                            size={Button.Sizes.SMALL}
-                            color={
-                                preference === option.value
-                                    ? Button.Colors.BRAND
-                                    : Button.Colors.PRIMARY
-                            }
+                            size="small"
+                            variant={preference === option.value ? "primary" : "secondary"}
                             onClick={() => {
                                 (settings.store as { queuePreference?: string }).queuePreference =
                                     option.value;
@@ -222,8 +219,8 @@ export function QueuePanel({ inline = false }: { inline?: boolean } = {}) {
                         <QueueRowView key={row.entry.questId} row={row} enabled={enabled} />
                     ))}
                     <Button
-                        size={Button.Sizes.SMALL}
-                        color={Button.Colors.PRIMARY}
+                        size="small"
+                        variant="secondary"
                         className="vc-questcord-queue-clear"
                         onClick={() => clearQueue()}
                     >

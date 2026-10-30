@@ -16,7 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Button, Popout, React } from "@webpack/common";
+import { Button } from "@components/Button";
+import { Popout, React } from "@webpack/common";
 
 import { getEntries, getVersion, subscribe } from "../quests/queue/store";
 import { QueuePanel } from "./QueuePanel";
@@ -40,12 +41,7 @@ export function QueueButton() {
                 renderPopout={() => <QueuePanel />}
             >
                 {(props: Record<string, any>) => (
-                    <Button
-                        {...props}
-                        size={Button.Sizes.SMALL}
-                        color={Button.Colors.PRIMARY}
-                        aria-label={t("queueAria")}
-                    >
+                    <Button {...props} size="small" variant="secondary" aria-label={t("queueAria")}>
                         {t("queueCount", { count })}
                     </Button>
                 )}

@@ -20,12 +20,6 @@ declare module "@webpack/common" {
 
     const Switch: React.FC<any>;
 
-    const Forms: {
-        FormTitle: React.FC<any>;
-        FormText: React.FC<any>;
-        FormSection: React.FC<any>;
-    };
-
     const RestAPI: {
         get(options: {
             url: string;
@@ -85,38 +79,6 @@ declare module "@webpack/common" {
 
     const Checkbox: React.FC<any>;
 
-    const Button: React.FC<any> & {
-        Link: React.FC<any>;
-        Color: {
-            BRAND: number;
-            GREEN: number;
-            RED: number;
-            YELLOW: number;
-            PRIMARY: number;
-            LINK: number;
-        };
-        Colors: {
-            BRAND: number;
-            GREEN: number;
-            RED: number;
-            YELLOW: number;
-            PRIMARY: number;
-            LINK: number;
-        };
-        Look: {
-            FILLED: number;
-            OUTLINED: number;
-            LINK: number;
-            INVERTED: number;
-        };
-        Sizes: {
-            SMALL: number;
-            MEDIUM: number;
-            LARGE: number;
-            MIN: number;
-        };
-    };
-
     const NavigationRouter: {
         transitionTo(path: string): void;
         back(): void;
@@ -157,7 +119,6 @@ declare module "@webpack/common" {
         Select,
         Slider,
         Switch,
-        Forms,
         RestAPI,
         GuildStore,
         GuildRoleStore,
@@ -165,7 +126,6 @@ declare module "@webpack/common" {
         UserStore,
         SearchableSelect,
         Checkbox,
-        Button,
         NavigationRouter,
         ChannelStore,
         InviteActions,

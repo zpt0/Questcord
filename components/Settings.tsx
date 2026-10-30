@@ -17,9 +17,11 @@
  */
 
 import "./settings.css";
+import { Heading } from "@components/Heading";
+import { Paragraph } from "@components/Paragraph";
 import { Switch } from "@components/Switch";
 import { classNameFactory } from "@utils/css";
-import { Forms, Select, Slider } from "@webpack/common";
+import { Select, Slider } from "@webpack/common";
 
 import { clearSavedQuestStates } from "../quests/manager";
 import { settings } from "../settings";
@@ -93,8 +95,8 @@ function SettingSlider({
     const value = settings.use([settingKey as any])[settingKey];
     return (
         <div className={cl("setting-item")}>
-            <Forms.FormTitle>{label}</Forms.FormTitle>
-            {note && <Forms.FormText style={{ marginBottom: 8 }}>{note}</Forms.FormText>}
+            <Heading>{label}</Heading>
+            {note && <Paragraph style={{ marginBottom: 8 }}>{note}</Paragraph>}
             <Slider
                 initialValue={value}
                 onValueChange={(v: number) => (settings.store[settingKey] = v)}
@@ -121,8 +123,8 @@ function SettingToggle({
         <div className={cl("setting-item")}>
             <div className={cl("toggle-row")}>
                 <div className={cl("toggle-label")}>
-                    <Forms.FormTitle style={{ marginBottom: 0 }}>{label}</Forms.FormTitle>
-                    {note && <Forms.FormText>{note}</Forms.FormText>}
+                    <Heading style={{ marginBottom: 0 }}>{label}</Heading>
+                    {note && <Paragraph>{note}</Paragraph>}
                 </div>
                 <Switch
                     checked={!!value}
@@ -147,8 +149,8 @@ function SettingSelect({
     const value = settings.use([settingKey as any])[settingKey];
     return (
         <div className={cl("setting-item")}>
-            <Forms.FormTitle>{label}</Forms.FormTitle>
-            {note && <Forms.FormText style={{ marginBottom: 8 }}>{note}</Forms.FormText>}
+            <Heading>{label}</Heading>
+            {note && <Paragraph style={{ marginBottom: 8 }}>{note}</Paragraph>}
             <Select
                 options={options}
                 select={(v: string) => (settings.store[settingKey] = v)}
@@ -173,8 +175,8 @@ function SettingColor({
         <div className={cl("setting-item")}>
             <div className={cl("color-row")}>
                 <div className={cl("color-label")}>
-                    <Forms.FormTitle>{label}</Forms.FormTitle>
-                    {note && <Forms.FormText>{note}</Forms.FormText>}
+                    <Heading>{label}</Heading>
+                    {note && <Paragraph>{note}</Paragraph>}
                 </div>
                 <ColorPicker
                     value={value}
@@ -192,7 +194,7 @@ export function QuestSettings() {
 
             <QueueSettings />
 
-            <Forms.FormSection title="Notifications">
+            <section title="Notifications">
                 <SettingToggle
                     settingKey="showNotifications"
                     label="Show notifications"
@@ -207,9 +209,9 @@ export function QuestSettings() {
                     markers={[1, 2, 3, 4, 6, 8, 10]}
                     unit="s"
                 />
-            </Forms.FormSection>
+            </section>
 
-            <Forms.FormSection title="Automation">
+            <section title="Automation">
                 <SettingToggle
                     settingKey="autoResumeAfterReload"
                     label="Resume after reload"
@@ -236,18 +238,18 @@ export function QuestSettings() {
                     note="How often activity quests report progress (slower is safer on rate limits)"
                     options={HEARTBEAT_OPTIONS}
                 />
-            </Forms.FormSection>
+            </section>
 
-            <Forms.FormSection title="Pill position">
+            <section title="Pill position">
                 <SettingSelect
                     settingKey="pillPosition"
                     label="Position"
                     note="Where quest progress pills appear on screen"
                     options={POSITION_OPTIONS}
                 />
-            </Forms.FormSection>
+            </section>
 
-            <Forms.FormSection title="Pill colors">
+            <section title="Pill colors">
                 <div className={cl("color-grid")}>
                     <SettingColor
                         settingKey="pillBgColor"
@@ -280,9 +282,9 @@ export function QuestSettings() {
                         note="Pill border color"
                     />
                 </div>
-            </Forms.FormSection>
+            </section>
 
-            <Forms.FormSection title="Pill appearance">
+            <section title="Pill appearance">
                 <SettingSlider
                     settingKey="pillBorderRadius"
                     label="Corner Radius"
@@ -316,9 +318,9 @@ export function QuestSettings() {
                     max={16}
                     markers={[4, 6, 8, 10, 12, 16]}
                 />
-            </Forms.FormSection>
+            </section>
 
-            <Forms.FormSection title="Reset">
+            <section title="Reset">
                 <div style={{ display: "flex", gap: 8 }}>
                     <button
                         className={cl("check-update-btn")}
@@ -356,7 +358,7 @@ export function QuestSettings() {
                         Clear Saved Quests
                     </button>
                 </div>
-            </Forms.FormSection>
+            </section>
         </div>
     );
 }

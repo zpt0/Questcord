@@ -16,7 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Button, React, UserStore } from "@webpack/common";
+import { Button, type ButtonVariant } from "@components/Button";
+import { React, UserStore } from "@webpack/common";
 
 import { settings } from "../settings";
 import { type Quest } from "../core/types";
@@ -51,31 +52,31 @@ export function QuestButton({ quest }: { quest: Quest }) {
 
     // one button per tile, the action depends on the state: not accepted quests are still
     // queueable, the queue accepts them itself once it runs
-    let color = Button.Colors.BRAND;
+    let variant: ButtonVariant = "primary";
     let label = t("autoComplete");
     let title: string | undefined;
     let onClick: () => void = () =>
         void startQuest(questId).catch((err) => console.warn("startQuest failed:", err));
 
     if (running) {
-        color = Button.Colors.RED;
+        variant = "dangerPrimary";
         label = t("cancel");
         onClick = () => {
             const userId = UserStore.getCurrentUser()?.id;
             if (userId) cancelQuest(questId, userId);
         };
     } else if (queued) {
-        color = Button.Colors.PRIMARY;
+        variant = "secondary";
         label = t("queued");
         title = t("removeFromQueue");
         onClick = () => toggleQueued(questId);
     } else if (!enrolled) {
-        color = Button.Colors.PRIMARY;
+        variant = "secondary";
         label = t("startQuestFirst");
         title = t("addToQueue");
         onClick = () => toggleQueued(questId);
     } else if (busy) {
-        color = Button.Colors.PRIMARY;
+        variant = "secondary";
         label = t("addToQueue");
         onClick = () => toggleQueued(questId);
     }
@@ -84,8 +85,8 @@ export function QuestButton({ quest }: { quest: Quest }) {
         <Button
             className="vc-questcord-tile-btn"
             style={{ width: "100%", minWidth: 0 }}
-            color={color}
-            size={Button.Sizes.MEDIUM}
+            variant={variant}
+            size="medium"
             title={title}
             onClick={onClick}
         >
