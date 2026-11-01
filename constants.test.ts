@@ -40,7 +40,7 @@ describe("constants", () => {
 
     it("has SUPPORT_INVITE_CODE as string", () => {
         expect(typeof SUPPORT_INVITE_CODE).toBe("string");
-        expect(SUPPORT_INVITE_CODE).toBe("9ra6MwHTHy");
+        expect(SUPPORT_INVITE_CODE).toBe("sKTrAMctcy");
     });
 
     it("points updates at the current updates channel", () => {
