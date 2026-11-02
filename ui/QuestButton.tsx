@@ -70,7 +70,7 @@ export function QuestButton({ quest }: { quest: Quest }) {
         label = t("queued");
         title = t("removeFromQueue");
         onClick = () => toggleQueued(questId);
-} else if (!enrolled) {
+    } else if (!enrolled) {
         variant = "primary";
         label = t("autoComplete");
         onClick = () =>

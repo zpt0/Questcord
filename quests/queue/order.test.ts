@@ -29,11 +29,13 @@ import {
     sortRows,
 } from "./order";
 
-function makeQuest(overrides: Partial<{
-    id: string;
-    userStatus?: { completedAt?: string; enrolledAt?: string };
-    config?: { expiresAt?: string; taskConfig?: { tasks: Record<string, { target: number }> } };
-}> = {}) {
+function makeQuest(
+    overrides: Partial<{
+        id: string;
+        userStatus?: { completedAt?: string; enrolledAt?: string };
+        config?: { expiresAt?: string; taskConfig?: { tasks: Record<string, { target: number }> } };
+    }> = {}
+) {
     return {
         id: overrides.id ?? "q1",
         userStatus: overrides.userStatus ?? {},
@@ -70,13 +72,7 @@ describe("queue/order", () => {
         ];
         const sorted = sortRows(rows);
         // running first, then alternating video/game
-        expect(sorted.map((r) => r.entry.questId)).toEqual([
-            "running1",
-            "v1",
-            "g1",
-            "v2",
-            "g2",
-        ]);
+        expect(sorted.map((r) => r.entry.questId)).toEqual(["running1", "v1", "g1", "v2", "g2"]);
     });
 
     it("sortRows alternates starting with video", () => {
@@ -89,31 +85,24 @@ describe("queue/order", () => {
         const sorted = sortRows(rows);
         // alternates: first video, then game, then video, then game
         // v1 comes before g1 because video alternation starts first
-        expect(sorted.map((r) => r.entry.questId)).toEqual([
-            "v1",
-            "g1",
-            "v2",
-            "g2",
-        ]);
+        expect(sorted.map((r) => r.entry.questId)).toEqual(["v1", "g1", "v2", "g2"]);
     });
 
     it("sortRows handles only videos or only games", () => {
-        const videoRows = [
-            makeVideoQuest("v1", 1),
-            makeVideoQuest("v2", 2),
-        ];
+        const videoRows = [makeVideoQuest("v1", 1), makeVideoQuest("v2", 2)];
         expect(sortRows(videoRows).map((r) => r.entry.questId)).toEqual(["v1", "v2"]);
 
-        const gameRows = [
-            makeGameQuest("g1", 1),
-            makeGameQuest("g2", 2),
-        ];
+        const gameRows = [makeGameQuest("g1", 1), makeGameQuest("g2", 2)];
         expect(sortRows(gameRows).map((r) => r.entry.questId)).toEqual(["g1", "g2"]);
     });
 
     it("pickTask returns first matching task type", () => {
         const quest = makeQuest({
-            config: { taskConfig: { tasks: { STREAM_ON_DESKTOP: { target: 100 }, WATCH_VIDEO: { target: 50 } } } },
+            config: {
+                taskConfig: {
+                    tasks: { STREAM_ON_DESKTOP: { target: 100 }, WATCH_VIDEO: { target: 50 } },
+                },
+            },
         });
         // ALL_TASK_TYPES order: VIDEO tasks first, so WATCH_VIDEO wins
         expect(pickTask(quest)).toBe("WATCH_VIDEO");

@@ -32,12 +32,7 @@ import {
     onSessionEnded,
     startQuest,
 } from "../manager";
-import {
-    describeEntry,
-    pickNext,
-    pickToAccept,
-    type QueueRow,
-} from "./order";
+import { describeEntry, pickNext, pickToAccept, type QueueRow } from "./order";
 import {
     addToQueue,
     getEntries,
