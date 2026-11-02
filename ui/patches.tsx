@@ -51,6 +51,15 @@ export const questPatches = [
             replace: "$1,$self.renderQuestButton($2),",
         },
     },
+    {
+        // v3+ tiles may use a different footer component, catch the generic pattern
+        find: ".QUEST_HOME_TILE_FOOTER",
+        noWarn: true,
+        replacement: {
+            match: /(\(0,\i\.jsx\)\(\i\.\i,\{quest:(\i),surface:\i\.\i\.QUEST_HOME_TILE_FOOTER,[^}]+\}\)),/,
+            replace: "$1,$self.renderQuestButton($2),",
+        },
+    },
 ] as any[];
 
 export function renderFooter(props: { quest?: Quest }, Footer: React.ComponentType<any>) {
