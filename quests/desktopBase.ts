@@ -131,160 +131,153 @@ export async function completeDesktopQuest(
                     `${LOG_PREFIX} Spoofed ${config.questType}: ${resolvedName} (pid: ${pid}, id: ${applicationId ?? "MISSING"})`
                 );
 
-                let lastServerProgress = currentProgress;
-                const startTime = Date.now();
-                // extra slack past the target; server-side progress can lag what we spoof
-                const maxRuntimeMs = secondsNeeded * 1000 + DESKTOP_MAX_RUNTIME_BUFFER_MS;
+let lastServerProgress = currentProgress;
+        const startTime = Date.now();
+        // extra slack past the target; server-side progress can lag what we spoof
+        const maxRuntimeMs = secondsNeeded * 1000 + DESKTOP_MAX_RUNTIME_BUFFER_MS;
 
-                const updateTicker = setInterval(() => {
-                    try {
-                        const questData = activeQuests.get(key);
-                        if (!questData || !questData.isProcessing || isPluginStopping) {
-                            clearInterval(updateTicker);
-                            return;
-                        }
+        let updateTicker: ReturnType<typeof setInterval> | null = null;
+        let heartbeatHandler: ((data: any) => void) | null = null;
 
-                        if (Date.now() - startTime > maxRuntimeMs) {
-                            clearInterval(updateTicker);
-                            debugLog(
-                                `${LOG_PREFIX} ${config.questType} quest timed out after ${Math.round(maxRuntimeMs / 60000)}m`
-                            );
-                            try {
-                                config.restoreStore(storeLocal, realFunc);
-                                FluxDispatcherLocal.unsubscribe(
-                                    "QUESTS_SEND_HEARTBEAT_SUCCESS",
-                                    heartbeatHandler
-                                );
-                            } catch (e) {
-                                debugLog(`${LOG_PREFIX} Timeout cleanup error:`, e);
-                            }
-                            const timedOutName = getQuestName(quest, config.defaultQuestName);
-                            notify(
-                                "Quest Timeout",
-                                `${timedOutName} made no server progress in time. Try again later.`,
-                                "error",
-                                quest.id
-                            );
-                            removeProgressBar(quest.id, userId);
-                            cleanupQuest(quest.id, userId);
-                            resolve(false);
-                            return;
-                        }
+        const cleanupSpoof = () => {
+            try {
+                if (updateTicker) clearInterval(updateTicker);
+                config.restoreStore(storeLocal, realFunc);
+                if (FluxDispatcherLocal && heartbeatHandler) {
+                    FluxDispatcherLocal.unsubscribe(
+                        "QUESTS_SEND_HEARTBEAT_SUCCESS",
+                        heartbeatHandler
+                    );
+                }
+            } catch (e) {
+                debugLog(`${LOG_PREFIX} Cleanup error:`, e);
+            }
+        };
 
-                        const liveQuest = QuestsStore?.getQuest?.(quest.id);
-                        const liveProgress = Math.floor(
-                            config.getProgressFromQuest(liveQuest, lastServerProgress)
-                        );
+        const updateTickerCallback = () => {
+            try {
+                const questData = activeQuests.get(key);
+                if (!questData || !questData.isProcessing || isPluginStopping) {
+                    if (updateTicker) clearInterval(updateTicker);
+                    cleanupSpoof();
+                    removeProgressBar(quest.id, userId);
+                    cleanupQuest(quest.id, userId);
+                    resolve(false);
+                    return;
+                }
 
-                        if (liveProgress > lastServerProgress) {
-                            lastServerProgress = liveProgress;
-                        }
+                if (Date.now() - startTime > maxRuntimeMs) {
+                    if (updateTicker) clearInterval(updateTicker);
+                    debugLog(
+                        `${LOG_PREFIX} ${config.questType} quest timed out after ${Math.round(maxRuntimeMs / 60000)}m`
+                    );
+                    cleanupSpoof();
+                    const timedOutName = getQuestName(quest, config.defaultQuestName);
+                    notify(
+                        "Quest Timeout",
+                        `${timedOutName} made no server progress in time. Try again later.`,
+                        "error",
+                        quest.id
+                    );
+                    removeProgressBar(quest.id, userId);
+                    cleanupQuest(quest.id, userId);
+                    resolve(false);
+                    return;
+                }
 
-                        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                        const estimatedProgress = Math.min(
-                            secondsNeeded,
-                            Math.max(lastServerProgress, currentProgress + elapsed)
-                        );
+                const liveQuest = QuestsStore?.getQuest?.(quest.id);
+                const liveProgress = Math.floor(
+                    config.getProgressFromQuest(liveQuest, lastServerProgress)
+                );
 
-                        const percent =
-                            liveProgress >= secondsNeeded
-                                ? 100
-                                : Math.min(
-                                      99,
-                                      Math.floor((estimatedProgress / secondsNeeded) * 100)
-                                  );
+                if (liveProgress > lastServerProgress) {
+                    lastServerProgress = liveProgress;
+                }
 
-                        updateProgressBar(quest.id, userId, percent);
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const estimatedProgress = Math.min(
+                    secondsNeeded,
+                    Math.max(lastServerProgress, currentProgress + elapsed)
+                );
 
-                        if (liveProgress >= secondsNeeded) {
-                            clearInterval(updateTicker);
-                            debugLog(
-                                `${LOG_PREFIX} ${config.questType} quest completed on backend!`
-                            );
-                            config.restoreStore(storeLocal, realFunc);
-                            FluxDispatcherLocal.unsubscribe(
-                                "QUESTS_SEND_HEARTBEAT_SUCCESS",
-                                heartbeatHandler
-                            );
-                            const questName = getQuestName(quest, config.defaultQuestName);
-                            completeQuestPill(quest.id, `${questName} Completed!`, "success");
-                            cleanupQuest(quest.id, userId);
-                            resolve(true);
-                        }
-                    } catch (e) {
-                        debugLog(`${LOG_PREFIX} updateTicker error:`, e);
-                    }
-                }, 1000);
+                const percent =
+                    liveProgress >= secondsNeeded
+                        ? 100
+                        : Math.min(
+                              99,
+                              Math.floor((estimatedProgress / secondsNeeded) * 100)
+                          );
 
-                const heartbeatHandler = (data: any) => {
-                    try {
-                        const questData = activeQuests.get(key);
-                        if (!questData || !questData.isProcessing || isPluginStopping) {
-                            clearInterval(updateTicker);
-                            config.restoreStore(storeLocal, realFunc);
-                            FluxDispatcherLocal.unsubscribe(
-                                "QUESTS_SEND_HEARTBEAT_SUCCESS",
-                                heartbeatHandler
-                            );
-                            removeProgressBar(quest.id, userId);
-                            resolve(false);
-                            return;
-                        }
+                updateProgressBar(quest.id, userId, percent);
 
-                        const liveQuest = QuestsStore?.getQuest?.(quest.id);
-                        const progress = Math.floor(
-                            config.getProgressFromHeartbeat(
-                                { ...data, liveQuest },
-                                lastServerProgress
-                            )
-                        );
+                if (liveProgress >= secondsNeeded) {
+                    if (updateTicker) clearInterval(updateTicker);
+                    debugLog(
+                        `${LOG_PREFIX} ${config.questType} quest completed on backend!`
+                    );
+                    cleanupSpoof();
+                    const questName = getQuestName(quest, config.defaultQuestName);
+                    completeQuestPill(quest.id, `${questName} Completed!`, "success");
+                    cleanupQuest(quest.id, userId);
+                    resolve(true);
+                }
+            } catch (e) {
+                debugLog(`${LOG_PREFIX} updateTicker error:`, e);
+            }
+        };
 
-                        if (progress > lastServerProgress) {
-                            lastServerProgress = progress;
-                        }
+        heartbeatHandler = (data: any) => {
+            try {
+                const questData = activeQuests.get(key);
+                if (!questData || !questData.isProcessing || isPluginStopping) {
+                    if (updateTicker) clearInterval(updateTicker);
+                    cleanupSpoof();
+                    removeProgressBar(quest.id, userId);
+                    resolve(false);
+                    return;
+                }
 
-                        const percent =
-                            progress >= secondsNeeded
-                                ? 100
-                                : Math.min(99, Math.floor((progress / secondsNeeded) * 100));
-                        updateProgressBar(quest.id, userId, percent);
-                        debugLog(
-                            `${LOG_PREFIX} ${config.questType} progress: ${progress}/${secondsNeeded} (${percent}%)`
-                        );
+                const liveQuest = QuestsStore?.getQuest?.(quest.id);
+                const progress = Math.floor(
+                    config.getProgressFromHeartbeat(
+                        { ...data, liveQuest },
+                        lastServerProgress
+                    )
+                );
 
-                        if (progress >= secondsNeeded) {
-                            clearInterval(updateTicker);
-                            debugLog(`${LOG_PREFIX} Quest completed!`);
-                            config.restoreStore(storeLocal, realFunc);
-                            FluxDispatcherLocal.unsubscribe(
-                                "QUESTS_SEND_HEARTBEAT_SUCCESS",
-                                heartbeatHandler
-                            );
-                            const questName = getQuestName(quest, config.defaultQuestName);
-                            completeQuestPill(quest.id, `${questName} Completed!`, "success");
-                            cleanupQuest(quest.id, userId);
-                            resolve(true);
-                        }
-                    } catch (e) {
-                        console.error(`${LOG_PREFIX} Heartbeat handler error:`, e);
-                    }
-                };
+                if (progress > lastServerProgress) {
+                    lastServerProgress = progress;
+                }
 
-                FluxDispatcherLocal.subscribe("QUESTS_SEND_HEARTBEAT_SUCCESS", heartbeatHandler);
-                const cleanups = cleanupFunctions.get(key) || [];
-                cleanups.push(() => {
-                    try {
-                        clearInterval(updateTicker);
-                        config.restoreStore(storeLocal, realFunc);
-                        FluxDispatcherLocal.unsubscribe(
-                            "QUESTS_SEND_HEARTBEAT_SUCCESS",
-                            heartbeatHandler
-                        );
-                    } catch (e) {
-                        debugLog(`${LOG_PREFIX} Cleanup error:`, e);
-                    }
-                });
-                cleanupFunctions.set(key, cleanups);
+                const percent =
+                    progress >= secondsNeeded
+                        ? 100
+                        : Math.min(99, Math.floor((progress / secondsNeeded) * 100));
+                updateProgressBar(quest.id, userId, percent);
+                debugLog(
+                    `${LOG_PREFIX} ${config.questType} progress: ${progress}/${secondsNeeded} (${percent}%)`
+                );
+
+                if (progress >= secondsNeeded) {
+                    if (updateTicker) clearInterval(updateTicker);
+                    debugLog(`${LOG_PREFIX} Quest completed!`);
+                    cleanupSpoof();
+                    const questName = getQuestName(quest, config.defaultQuestName);
+                    completeQuestPill(quest.id, `${questName} Completed!`, "success");
+                    cleanupQuest(quest.id, userId);
+                    resolve(true);
+                }
+            } catch (e) {
+                console.error(`${LOG_PREFIX} Heartbeat handler error:`, e);
+            }
+        };
+
+        updateTicker = setInterval(updateTickerCallback, 1000);
+
+        FluxDispatcherLocal.subscribe("QUESTS_SEND_HEARTBEAT_SUCCESS", heartbeatHandler);
+        const cleanups = cleanupFunctions.get(key) || [];
+        cleanups.push(cleanupSpoof);
+        cleanupFunctions.set(key, cleanups);
             } catch (error: any) {
                 console.error(`${LOG_PREFIX} Failed to complete ${config.questType} quest:`, error);
                 notify(
