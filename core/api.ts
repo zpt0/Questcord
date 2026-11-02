@@ -83,6 +83,14 @@ interface RetryDecision {
 function decideRetry(error: any, attempt: number, maxRetries: number): RetryDecision {
     const status = getErrorStatus(error);
 
+    // 404 = resource not found - retrying won't help, fail fast
+    if (status === 404) {
+        return { shouldRetry: false, waitMs: 0, reason: "" };
+    }
+    // 403 = forbidden - retrying won't help, fail fast
+    if (status === 403) {
+        return { shouldRetry: false, waitMs: 0, reason: "" };
+    }
     if (status != null && status < 500 && status !== 429) {
         return { shouldRetry: false, waitMs: 0, reason: "" };
     }
@@ -130,6 +138,18 @@ export async function discordApiGet(endpoint: string, maxRetries = MAX_RETRIES):
                     const retryAfter = parseRetryAfterMs(response);
                     if (retryAfter != null) error.retryAfter = retryAfter;
                 }
+                // extract Discord error message from body
+                try {
+                    const bodyText = await response.text();
+                    if (bodyText) {
+                        try {
+                            const parsed = JSON.parse(bodyText);
+                            if (parsed?.message) error.message = parsed.message;
+                        } catch {
+                            error.message = bodyText;
+                        }
+                    }
+                } catch {}
                 throw error;
             }
             return response.json();
@@ -168,6 +188,14 @@ export async function discordApiPost(endpoint: string, body: any): Promise<any> 
         const error: ApiError = new Error(`API POST failed: ${response.status}`);
         error.status = response.status;
         error.body = errorBody;
+        // extract the Discord error message from the JSON body if available
+        try {
+            const parsed = JSON.parse(errorBody);
+            if (parsed?.message) error.message = parsed.message;
+        } catch {
+            // not JSON, keep the raw body as the message
+            if (errorBody) error.message = errorBody;
+        }
         if (response.status === 429) {
             const retryAfter = parseRetryAfterMs(response);
             if (retryAfter != null) error.retryAfter = retryAfter;

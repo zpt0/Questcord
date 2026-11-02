@@ -285,9 +285,27 @@ export async function acceptQuestById(questId: string): Promise<{
         await rateLimitedPost(`/quests/${questId}/enroll`, { location: 2 });
         // store takes a moment to reflect enrollment before callers read it
         await new Promise((r) => setTimeout(r, 1500));
+        // re-read from store to confirm enrollment succeeded
+        const orig = suppressConsole("log", "warn");
+        let enrolled = false;
+        try {
+            const updated = QuestsStore?.getQuest?.(questId);
+            enrolled = !!updated?.userStatus?.enrolledAt;
+        } finally {
+            restoreConsole(orig);
+        }
+        if (!enrolled) {
+            return { ok: false, reason: "Enrollment not confirmed in store" };
+        }
         return { ok: true };
     } catch (e: any) {
         const status = e?.status ?? e?.response?.status;
+        if (status === 404) {
+            return { ok: false, reason: e?.message ?? "Quest not found" };
+        }
+        if (status === 403) {
+            return { ok: false, reason: e?.message ?? "Quest locked" };
+        }
         if (status === 429) {
             const retryAfter = e?.retryAfter ?? 30_000;
             return {
@@ -339,6 +357,8 @@ export async function startQuest(
             return "invalid";
         }
         if (!quest.userStatus?.enrolledAt) {
+            let enrollFailed = false;
+            let enrollmentErrorMessage = "";
             try {
                 notify("Enrolling...", "Accepting quest automatically...", "info");
                 await rateLimitedPost(`/quests/${questId}/enroll`, { location: 2 });
@@ -358,16 +378,42 @@ export async function startQuest(
                     return "error";
                 }
             } catch (enrollError: any) {
-                console.error(`${LOG_PREFIX} Auto-enroll failed:`, enrollError);
+                const status = enrollError?.status ?? enrollError?.response?.status;
+                const message = enrollError?.message ?? "";
+                const errorBody = enrollError?.body ?? "";
+                console.error(
+                    `${LOG_PREFIX} Auto-enroll failed: status=${status} message="${message}" body="${errorBody}"`
+                );
+                enrollFailed = true;
+                enrollmentErrorMessage = message || errorBody || `HTTP ${status ?? "unknown"}`;
+                // 404 means the quest doesn't exist anymore - don't retry, just fail
+                if (status === 404) {
+                    notify(
+                        "Quest Not Found",
+                        "This quest is no longer available. It may have expired or been removed.",
+                        "error"
+                    );
+                    return "invalid";
+                }
+                if (status === 403) {
+                    notify(
+                        "Quest Locked",
+                        "You don't have access to this quest. It may require a subscription or game ownership.",
+                        "error"
+                    );
+                    return "invalid";
+                }
             }
-        }
-        if (!quest.userStatus?.enrolledAt) {
-            notify(
-                "Enrollment Required",
-                "Please click 'Accept Quest' manually in Discord first!",
-                "error"
-            );
-            return "conflict";
+            if (enrollFailed || !quest.userStatus?.enrolledAt) {
+                notify(
+                    "Enrollment Required",
+                    enrollmentErrorMessage
+                        ? `Could not auto-enroll: ${enrollmentErrorMessage}`
+                        : "Please click 'Accept Quest' manually in Discord first!",
+                    "error"
+                );
+                return "conflict";
+            }
         }
         const expiresAt = quest.config?.expiresAt ?? quest.expiresAt;
         if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
