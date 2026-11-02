@@ -111,7 +111,8 @@ export function sortRows(rows: readonly QueueRow[]): QueueRow[] {
 
     // alternate video and game, starting with video
     const alternated: QueueRow[] = [];
-    let vi = 0, gi = 0;
+    let vi = 0,
+        gi = 0;
     while (vi < videos.length || gi < games.length) {
         if (vi < videos.length) alternated.push(videos[vi++]);
         if (gi < games.length) alternated.push(games[gi++]);

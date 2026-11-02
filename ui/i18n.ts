@@ -31,15 +31,15 @@ import type { UiMessages, UiMessageKey } from "./i18n/types";
 
 const LOCALES: Record<string, Partial<UiMessages>> = {
     "en-US": enMessages,
-    "de": deMessages,
-    "fr": frMessages,
-    "es": esMessages,
-    "it": itMessages,
-    "pt": ptMessages,
-    "ru": ruMessages,
-    "ja": jaMessages,
-    "ko": koMessages,
-    "zh": zhMessages,
+    de: deMessages,
+    fr: frMessages,
+    es: esMessages,
+    it: itMessages,
+    pt: ptMessages,
+    ru: ruMessages,
+    ja: jaMessages,
+    ko: koMessages,
+    zh: zhMessages,
 };
 
 export const DEFAULT_LOCALE = "en-US";
