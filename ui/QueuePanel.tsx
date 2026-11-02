@@ -127,6 +127,9 @@ const HEADING_STYLE: React.CSSProperties = {
     textTransform: "uppercase",
     letterSpacing: "0.02em",
     color: "var(--text-subtle, var(--text-muted, #949ba4))",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
 };
 
 const LIST_STYLE: React.CSSProperties = {

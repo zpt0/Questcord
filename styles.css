@@ -29,6 +29,7 @@
     pointer-events: none;
     align-items: center;
     padding: 24px;
+    box-sizing: border-box;
     /* --qc-* are set at runtime by applyPillContainerStyle in pillStyles.ts */
     --qc-accent: #5865f2;
     --qc-bg: #000000;
@@ -39,6 +40,7 @@
     --qc-radius: 24px;
     --qc-font-size: 14px;
     --qc-padding: 8px;
+    overflow: visible;
 }
 
 .vc-pill-container.qc-pos-top-left {
@@ -617,6 +619,7 @@
 
 .vc-questcord-footer {
     width: 100%;
+    box-sizing: border-box;
 }
 
 .vc-questcord-footer-row {
@@ -630,9 +633,11 @@
 .vc-questcord-tile-btn {
     width: 100%;
     min-width: 0;
+    max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    box-sizing: border-box;
 }
 
 .vc-questcord-queue-button-anchor {
