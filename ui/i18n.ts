@@ -17,106 +17,40 @@
  */
 
 import { UserStore } from "@webpack/common";
+import { messages as enMessages } from "./i18n/en-US";
+import { messages as deMessages } from "./i18n/de";
+import { messages as frMessages } from "./i18n/fr";
+import { messages as esMessages } from "./i18n/es";
+import { messages as itMessages } from "./i18n/it";
+import { messages as ptMessages } from "./i18n/pt";
+import { messages as ruMessages } from "./i18n/ru";
+import { messages as jaMessages } from "./i18n/ja";
+import { messages as koMessages } from "./i18n/ko";
+import { messages as zhMessages } from "./i18n/zh";
+import type { UiMessages, UiMessageKey } from "./i18n/types";
 
-export type UiMessageKey =
-    | "autoComplete"
-    | "addToQueue"
-    | "startQuestFirst"
-    | "removeFromQueue"
-    | "queued"
-    | "cancel"
-    | "queue"
-    | "queueCount"
-    | "runFirst"
-    | "videos"
-    | "games"
-    | "questsCount"
-    | "noQuestsTitle"
-    | "noQuestsHint"
-    | "remove"
-    | "clearQueue"
-    | "runAutomatically"
-    | "paused"
-    | "collecting"
-    | "gettingReady"
-    | "nothingToRun"
-    | "statusRunning"
-    | "statusWaiting"
-    | "statusAccepting"
-    | "statusUnavailable"
-    | "queueAria";
-
-type UiMessages = Record<UiMessageKey, string>;
-
-const MESSAGES: Record<string, Partial<UiMessages>> = {
-    de: {
-        autoComplete: "Automatisch abschließen",
-        addToQueue: "Zur Warteschlange hinzufügen",
-        startQuestFirst: "Erst Quest starten",
-        removeFromQueue: "Aus der Warteschlange entfernen",
-        queued: "In Warteschlange ✓",
-        cancel: "Abbrechen",
-        queue: "Warteschlange",
-        queueCount: "Warteschlange ({count})",
-        runFirst: "Zuerst ausführen",
-        videos: "Videos",
-        games: "Spiele",
-        questsCount: "Quests ({count})",
-        noQuestsTitle: "Keine Quests in der Warteschlange.",
-        noQuestsHint: 'Nutze "Zur Warteschlange hinzufügen" bei einer Quest.',
-        remove: "Entfernen",
-        clearQueue: "Warteschlange leeren",
-        runAutomatically: "Quests in der Warteschlange automatisch ausführen",
-        paused: "Pausiert",
-        collecting: "Orbs werden gesammelt...",
-        gettingReady: "Wird vorbereitet...",
-        nothingToRun: "Nichts auszuführen",
-        statusRunning: "Läuft{percent}",
-        statusWaiting: "Wartet",
-        statusAccepting: "Wird akzeptiert...",
-        statusUnavailable: "Nicht verfügbar",
-        queueAria: "Quest-Warteschlange",
-    },
+const LOCALES: Record<string, Partial<UiMessages>> = {
+    "en-US": enMessages,
+    "de": deMessages,
+    "fr": frMessages,
+    "es": esMessages,
+    "it": itMessages,
+    "pt": ptMessages,
+    "ru": ruMessages,
+    "ja": jaMessages,
+    "ko": koMessages,
+    "zh": zhMessages,
 };
 
-const DEFAULT_KEY = "en-US";
-
-const DEFAULT_MESSAGES: UiMessages = {
-    autoComplete: "Auto Complete",
-    addToQueue: "Add to queue",
-    startQuestFirst: "Start quest first",
-    removeFromQueue: "Remove from queue",
-    queued: "Queued ✓",
-    cancel: "Cancel",
-    queue: "Queue",
-    queueCount: "Queue ({count})",
-    runFirst: "Run first",
-    videos: "Videos",
-    games: "Games",
-    questsCount: "Quests ({count})",
-    noQuestsTitle: "No quests queued yet.",
-    noQuestsHint: 'Use "Add to queue" on a quest.',
-    remove: "Remove",
-    clearQueue: "Clear Queue",
-    runAutomatically: "Run queued quests automatically",
-    paused: "Paused",
-    collecting: "Collecting your Orbs...",
-    gettingReady: "Getting ready...",
-    nothingToRun: "Nothing to run",
-    statusRunning: "Running{percent}",
-    statusWaiting: "Waiting",
-    statusAccepting: "Accepting...",
-    statusUnavailable: "Unavailable",
-    queueAria: "Quest queue",
-};
+export const DEFAULT_LOCALE = "en-US";
+export const SUPPORTED_LOCALES = Object.keys(LOCALES);
 
 export function resolveMessages(locale: string | undefined | null): UiMessages {
     const base = (locale ?? "").split("-")[0].toLowerCase();
-    if (base && MESSAGES[base]) {
-        // spread defaults first so a partial translation falls back per key
-        return { ...DEFAULT_MESSAGES, ...MESSAGES[base] };
+    if (base && LOCALES[base]) {
+        return { ...enMessages, ...LOCALES[base] } as UiMessages;
     }
-    return DEFAULT_MESSAGES;
+    return enMessages as UiMessages;
 }
 
 export function translateMessage(
@@ -124,21 +58,23 @@ export function translateMessage(
     key: UiMessageKey,
     vars?: Record<string, string | number>
 ): string {
-    const text = resolveMessages(locale)[key] ?? DEFAULT_MESSAGES[key];
+    const text = resolveMessages(locale)[key] ?? enMessages[key];
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, (_match, name: string) =>
-        Object.hasOwn(vars, name) ? String(vars[name]) : `{${name}}`
+        Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : `{${name}}`
     );
 }
 
 export function getLocale(): string {
     try {
-        return UserStore.getCurrentUser()?.locale || DEFAULT_KEY;
+        return UserStore.getCurrentUser()?.locale || DEFAULT_LOCALE;
     } catch {
-        return DEFAULT_KEY;
+        return DEFAULT_LOCALE;
     }
 }
 
 export function t(key: UiMessageKey, vars?: Record<string, string | number>): string {
     return translateMessage(getLocale(), key, vars);
 }
+
+export { type UiMessageKey, type UiMessages };

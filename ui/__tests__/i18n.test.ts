@@ -17,6 +17,22 @@ describe("ui/i18n", () => {
         expect(translateMessage("de-DE", "addToQueue")).toBe("Zur Warteschlange hinzufügen");
     });
 
+    it("supports all 10 supported locales", () => {
+        const locales = ["en-US", "de", "fr", "es", "it", "pt", "ru", "ja", "ko", "zh"];
+        for (const locale of locales) {
+            const messages = resolveMessages(locale);
+            expect(messages.autoComplete).toBeTruthy();
+            expect(messages.addToQueue).toBeTruthy();
+            expect(messages.queue).toBeTruthy();
+            expect(messages.cancel).toBeTruthy();
+        }
+    });
+
+    it("falls back to English for unknown locales", () => {
+        expect(resolveMessages("xx-XX").cancel).toBe("Cancel");
+        expect(resolveMessages(null).addToQueue).toBe("Add to queue");
+    });
+
     it("substitutes variables in messages", () => {
         expect(translateMessage("en-US", "queueCount", { count: 3 })).toBe("Queue (3)");
         expect(translateMessage("de", "statusRunning", { percent: " 42%" })).toBe("Läuft 42%");
