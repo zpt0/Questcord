@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-export const PLUGIN_VERSION = "1.4.2";
+export const PLUGIN_VERSION = "1.5.0";
 export const LOG_PREFIX = "[Questcord]";
 export const GITHUB_REPO = "zpt0/Questcord";
 export const UPDATE_CHECK_URL = GITHUB_REPO
