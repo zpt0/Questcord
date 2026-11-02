@@ -59,6 +59,46 @@ function cleanupInjectedButtons() {
     } catch {}
 }
 
+// discord's popup copy changes with releases and locales, match loosely on QR + video keywords
+const MOBILE_POPUP_KEYWORDS: readonly string[] = [
+    // English
+    "continue on your phone",
+    "scan this qr code",
+    "continue the quest on your mobile",
+    "quest on your mobile",
+    // German
+    "auf deinem handy",
+    "qr-code",
+    "scanne diesen qr",
+    "quest auf deinem handy",
+    // French
+    "sur votre téléphone",
+    "scannez ce qr",
+    "quest sur votre téléphone",
+    // Spanish
+    "en tu teléfono",
+    "escanea este qr",
+    "quest en tu teléfono",
+    // Italian
+    "sul tuo telefono",
+    "scansiona questo qr",
+    // Portuguese
+    "no seu celular",
+    "digitalize este qr",
+    // Russian
+    "на телефоне",
+    "отсканируйте qr",
+    // Japanese
+    "携帯",
+    "qr",
+    // Korean
+    "휴대폰",
+    "qr",
+    // Chinese
+    "手机",
+    "二维码",
+];
+
 function tryDismissQuestVideo() {
     try {
         if (!settings.store.autoDismissQuestPopups) return;
@@ -68,6 +108,7 @@ function tryDismissQuestVideo() {
 
         for (const layer of Array.from(candidates)) {
             const text = (layer as HTMLElement).textContent ?? "";
+            const lower = text.toLowerCase();
 
             const video = layer.querySelector("video");
             if (video) {
@@ -85,12 +126,9 @@ function tryDismissQuestVideo() {
                 }
             }
 
-            // discord's popup copy, it changes with releases, so match loosely
-            if (
-                text.includes("Continue on your phone") ||
-                text.includes("Scan this QR code") ||
-                text.includes("continue the Quest on your mobile")
-            ) {
+            // match any mobile popup keyword (locale-agnostic)
+            const isMobilePopup = MOBILE_POPUP_KEYWORDS.some((kw) => lower.includes(kw));
+            if (isMobilePopup) {
                 const closeBtn = findCloseButton(layer);
                 if (closeBtn) {
                     debugLog(`${LOG_PREFIX} Auto-dismissing mobile QR code popup`);
@@ -104,17 +142,74 @@ function tryDismissQuestVideo() {
     }
 }
 
+const CLOSE_LABELS: readonly string[] = [
+    "Close",
+    "Schließen",
+    "Fermer",
+    "Chiudere",
+    "Fechar",
+    "Zamknąć",
+    "閉じる",
+    "关闭",
+    "cerrar",
+    "x",
+];
+
+const CLOSE_TEXTS: readonly string[] = [
+    "✕",
+    "×",
+    "╳",
+    "done",
+    "ok",
+    "cancel",
+    "abbruch",
+    "annuler",
+    "annulla",
+    "cancelar",
+    "отмена",
+    "キャンセル",
+    "取り消し",
+    "취소",
+    "取消",
+    "fermer",
+    "zamknij",
+    "cerrar",
+    "chiudi",
+    "fechar",
+    "閉じる",
+    "关闭",
+];
+
 function findCloseButton(container: Element): HTMLElement | null {
-    return (
-        (container.querySelector("[aria-label='Close']") as HTMLElement) ||
-        (container.querySelector("[class*='closeButton']") as HTMLElement) ||
-        (Array.from(container.querySelectorAll("button")).find(
-            (b) =>
-                b.getAttribute("aria-label")?.toLowerCase().includes("close") ||
-                b.textContent?.trim() === "✕" ||
-                b.textContent?.trim() === "×" ||
-                b.textContent?.trim() === "╳"
-        ) as HTMLElement | undefined) ||
-        null
-    );
+    for (const label of CLOSE_LABELS) {
+        const el = container.querySelector(`[aria-label='${label}']`) as HTMLElement;
+        if (el) return el;
+    }
+
+    const classSelectors = [
+        "[class*='closeButton']",
+        "[class*='close-btn']",
+        "[class*='dismiss']",
+        "[class*='cross']",
+        "[class*='exit']",
+        "[class*='close']",
+    ];
+    for (const sel of classSelectors) {
+        const el = container.querySelector(sel) as HTMLElement;
+        if (el) return el;
+    }
+
+    const buttons = Array.from(container.querySelectorAll("button"));
+    for (const b of buttons) {
+        const label = (b.getAttribute("aria-label") || "").toLowerCase();
+        const text = (b.textContent || "").trim().toLowerCase();
+        for (const cl of CLOSE_LABELS) {
+            if (label.includes(cl.toLowerCase())) return b as HTMLElement;
+        }
+        for (const ct of CLOSE_TEXTS) {
+            if (text === ct.toLowerCase()) return b as HTMLElement;
+        }
+    }
+
+    return null;
 }
