@@ -396,16 +396,6 @@
     transform: translateY(-1px);
 }
 
-.quest-btn.danger {
-    background: rgba(240, 71, 71, 0.2);
-    border-color: rgba(240, 71, 71, 0.4);
-    color: var(--qc-text);
-}
-
-.quest-btn.danger:hover {
-    background: rgba(240, 71, 71, 0.4);
-}
-
 .quest-pill.success .quest-pill-spinner {
     border-color: transparent;
     animation: none;

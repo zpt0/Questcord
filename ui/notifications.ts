@@ -88,7 +88,7 @@ export function createQuestPill(questId: string, title: string): void {
                     <div class="quest-pill-progress-fill"></div>
                 </div>
                 <div class="quest-pill-actions">
-                    <button class="quest-btn danger quest-cancel-btn">Cancel</button>
+                    <button class="quest-btn quest-cancel-btn">Cancel</button>
                 </div>
             </div>
         </div>

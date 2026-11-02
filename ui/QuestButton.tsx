@@ -59,7 +59,7 @@ export function QuestButton({ quest }: { quest: Quest }) {
         void startQuest(questId).catch((err) => console.warn("startQuest failed:", err));
 
     if (running) {
-        variant = "dangerPrimary";
+        variant = "primary";
         label = t("cancel");
         onClick = () => {
             const userId = UserStore.getCurrentUser()?.id;
@@ -70,11 +70,11 @@ export function QuestButton({ quest }: { quest: Quest }) {
         label = t("queued");
         title = t("removeFromQueue");
         onClick = () => toggleQueued(questId);
-    } else if (!enrolled) {
-        variant = "secondary";
-        label = t("startQuestFirst");
-        title = t("addToQueue");
-        onClick = () => toggleQueued(questId);
+} else if (!enrolled) {
+        variant = "primary";
+        label = t("autoComplete");
+        onClick = () =>
+            void startQuest(questId).catch((err) => console.warn("startQuest failed:", err));
     } else if (busy) {
         variant = "secondary";
         label = t("addToQueue");

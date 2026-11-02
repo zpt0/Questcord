@@ -79,7 +79,7 @@ function QueueRowView({ row, enabled }: { row: QueueRow; enabled: boolean }) {
             <Button
                 className="vc-questcord-queue-row-btn"
                 size="small"
-                variant={running ? "dangerPrimary" : "secondary"}
+                variant={running ? "primary" : "secondary"}
                 aria-label={running ? t("cancel") : t("remove")}
                 onClick={() => {
                     if (running) {
