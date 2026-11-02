@@ -74,7 +74,15 @@ export async function navigateToUpdatesChannel(): Promise<void> {
             console.warn("[Questcord] Failed to resolve invite:", e);
         }
 
-        openInviteModal(SUPPORT_INVITE_CODE);
+        try {
+            openInviteModal(SUPPORT_INVITE_CODE);
+        } catch (e) {
+            console.warn("[Questcord] Failed to open invite modal:", e);
+            // last resort: open the invite URL directly in a new tab
+            try {
+                window.open(`https://discord.gg/${SUPPORT_INVITE_CODE}`, "_blank");
+            } catch {}
+        }
     }
 }
 

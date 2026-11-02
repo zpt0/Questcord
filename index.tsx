@@ -22,7 +22,7 @@ import { findGroupChildrenByChildId, type NavContextMenuPatchCallback } from "@a
 import definePlugin from "@utils/types";
 import { Menu } from "@webpack/common";
 import { QuestSettings } from "./components/Settings";
-import { navigateToUpdatesChannel, showUpdateModal } from "./components/UpdateModal";
+import { showUpdateModal } from "./components/UpdateModal";
 import { PLUGIN_VERSION, UPDATE_CHECK_URL, UPDATE_CHECK_ENABLED, LOG_PREFIX } from "./constants";
 import { compareVersions } from "./core/utils";
 import { initializeStores } from "./core/stores";
@@ -251,7 +251,6 @@ export default definePlugin({
                         .finally(() => scheduleTick());
                 }, 10_000);
                 setTimeout(() => checkForUpdates(), 5000);
-                setTimeout(() => navigateToUpdatesChannel().catch(() => {}), 3000);
                 startStallWatchdog(DEFAULT_STALL_TIMEOUT_MS, {
                     shouldAutoRestart: () => settings.store.autoRestartStalled === true,
                     onRestart: (questId: string) => {
