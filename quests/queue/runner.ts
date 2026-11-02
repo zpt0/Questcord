@@ -23,7 +23,6 @@ import { QuestsStore } from "../../core/stores";
 import { getQuestName, type Quest } from "../../core/types";
 import { UserStore } from "@webpack/common";
 import { suppressConsole, restoreConsole } from "../../core/utils";
-import { settings } from "../../settings";
 import { notify } from "../../ui/notifications";
 import {
     acceptQuestById,
@@ -37,7 +36,6 @@ import {
     describeEntry,
     pickNext,
     pickToAccept,
-    type QueuePreference,
     type QueueRow,
 } from "./order";
 import {
@@ -65,10 +63,6 @@ const pausedIds = new Set<string>();
 let pending: ReturnType<typeof setTimeout> | undefined;
 let unsubscribers: Array<() => void> = [];
 
-export const getPreference = (): QueuePreference =>
-    (settings.store as { queuePreference?: string }).queuePreference === "games"
-        ? "games"
-        : "videos";
 export { isQueueEnabled };
 
 function safeGetQuest(questId: string): Quest | undefined {
@@ -122,7 +116,8 @@ async function acceptPending() {
     try {
         while (active && isQueueEnabled()) {
             if (Date.now() < acceptPausedUntil) return;
-            const row = pickToAccept(getRows(), getPreference());
+            // re-read rows after each accept so newly-ready quests are picked up
+            const row = pickToAccept(getRows());
             if (!row?.quest) return;
             const { questId } = row.entry;
             setAccepting(questId, true);
@@ -152,13 +147,18 @@ async function tick() {
     if (!active || busy || !isQueueEnabled() || !accountReady()) return;
     busy = true;
     try {
+        // remove unavailable entries first
         for (const row of getRows()) {
             if (row.state === "unavailable") removeFromQueue(row.entry.questId);
         }
-        void acceptPending();
+
+        // accept any pending quests first, then re-read rows to see if they became ready
+        await acceptPending();
+
         const rows = getRows();
         if (rows.some((r) => r.state === "running")) return;
-        const next = pickNext(rows, getPreference());
+
+        const next = pickNext(rows);
         if (!next) {
             if (hadWork && getEntries().length === 0) {
                 hadWork = false;
@@ -172,8 +172,10 @@ async function tick() {
             prompt: false,
             auto: true,
         });
-        if (result === "invalid" || result === "conflict") {
-            if (result === "invalid") removeFromQueue(next.entry.questId);
+        if (result === "invalid") {
+            removeFromQueue(next.entry.questId);
+            scheduleTick(SETTLE_MS);
+        } else if (result === "conflict") {
             scheduleTick(SETTLE_MS);
         }
     } catch (e) {

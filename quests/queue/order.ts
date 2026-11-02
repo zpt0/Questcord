@@ -31,7 +31,6 @@ export interface QueueEntry {
 }
 
 export type QueueKind = "video" | "game";
-export type QueuePreference = "videos" | "games";
 export type RowState = "running" | "ready" | "needs-accept" | "unavailable";
 
 export interface QueueRow {
@@ -86,31 +85,47 @@ export function describeEntry(
     return { entry, quest, task, kind, state };
 }
 
-export function sortRows(rows: readonly QueueRow[], preference: QueuePreference): QueueRow[] {
-    const preferred: QueueKind = preference === "games" ? "game" : "video";
-    const rank = (row: QueueRow) =>
-        (row.state === "running" ? 0 : 10) + (row.kind === preferred ? 0 : row.kind ? 1 : 2);
-    return [...rows].sort((a, b) => rank(a) - rank(b) || a.entry.addedAt - b.entry.addedAt);
+/**
+ * Sorts rows so running quests appear first, then alternates video/game
+ * round-robin by insertion order. No preference — one video, one game, one video, …
+ */
+export function sortRows(rows: readonly QueueRow[]): QueueRow[] {
+    const array = [...rows];
+    const running: QueueRow[] = [];
+    const videos: QueueRow[] = [];
+    const games: QueueRow[] = [];
+    const other: QueueRow[] = [];
+
+    for (const row of array) {
+        if (row.state === "running") running.push(row);
+        else if (row.kind === "video") videos.push(row);
+        else if (row.kind === "game") games.push(row);
+        else other.push(row);
+    }
+
+    // sort each bucket by insertion order
+    const byAdded = (a: QueueRow, b: QueueRow) => a.entry.addedAt - b.entry.addedAt;
+    videos.sort(byAdded);
+    games.sort(byAdded);
+    other.sort(byAdded);
+
+    // alternate video and game, starting with video
+    const alternated: QueueRow[] = [];
+    let vi = 0, gi = 0;
+    while (vi < videos.length || gi < games.length) {
+        if (vi < videos.length) alternated.push(videos[vi++]);
+        if (gi < games.length) alternated.push(games[gi++]);
+    }
+
+    return [...running, ...alternated, ...other];
 }
 
-export function pickNext(
-    rows: readonly QueueRow[],
-    preference: QueuePreference
-): QueueRow | undefined {
-    return sortRows(
-        rows.filter((r) => r.state === "ready"),
-        preference
-    )[0];
+export function pickNext(rows: readonly QueueRow[]): QueueRow | undefined {
+    return sortRows(rows.filter((r) => r.state === "ready"))[0];
 }
 
-export function pickToAccept(
-    rows: readonly QueueRow[],
-    preference: QueuePreference
-): QueueRow | undefined {
-    return sortRows(
-        rows.filter((r) => r.state === "needs-accept"),
-        preference
-    )[0];
+export function pickToAccept(rows: readonly QueueRow[]): QueueRow | undefined {
+    return sortRows(rows.filter((r) => r.state === "needs-accept"))[0];
 }
 
 export { getQuestName };

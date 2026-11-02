@@ -22,9 +22,8 @@ import { React, UserStore } from "@webpack/common";
 
 import { getQuestName } from "../core/types";
 import { cancelQuest, getRunningPercent } from "../quests/manager";
-import type { QueuePreference, QueueRow } from "../quests/queue/order";
-import { sortRows } from "../quests/queue/order";
-import { getPreference, getRows, isQueueEnabled, setQueueEnabled } from "../quests/queue/runner";
+import type { QueueRow } from "../quests/queue/order";
+import { getRows, isQueueEnabled, setQueueEnabled } from "../quests/queue/runner";
 import {
     clearQueue,
     getVersion as getQueueVersion,
@@ -32,7 +31,6 @@ import {
     removeFromQueue,
     subscribe as subscribeQueue,
 } from "../quests/queue/store";
-import { settings } from "../settings";
 import { t } from "./i18n";
 
 function subtitleOf(row: QueueRow): string {
@@ -107,8 +105,6 @@ function EmptyState() {
     );
 }
 
-const ORDER_OPTIONS: Array<{ value: QueuePreference }> = [{ value: "videos" }, { value: "games" }];
-
 const PANEL_STYLE: React.CSSProperties = {
     boxSizing: "border-box",
     display: "flex",
@@ -149,8 +145,6 @@ const INLINE_STYLE: React.CSSProperties = {
 
 export function QueuePanel({ inline = false }: { inline?: boolean } = {}) {
     const queueVersion = React.useSyncExternalStore(subscribeQueue, getQueueVersion);
-    const preference = (settings.use(["queuePreference" as never]) as { queuePreference?: string })
-        .queuePreference;
 
     const [, forceTick] = React.useReducer((n: number) => n + 1, 0);
     React.useEffect(() => {
@@ -163,7 +157,7 @@ export function QueuePanel({ inline = false }: { inline?: boolean } = {}) {
     void queueVersion;
 
     const enabled = isQueueEnabled();
-    const rows = sortRows(getRows(), getPreference());
+    const rows = getRows();
 
     return (
         <div className="vc-questcord-queue-panel" style={inline ? INLINE_STYLE : PANEL_STYLE}>
@@ -183,29 +177,6 @@ export function QueuePanel({ inline = false }: { inline?: boolean } = {}) {
                     </div>
                 )}
                 <Switch checked={enabled} onChange={(value: boolean) => setQueueEnabled(value)} />
-            </div>
-
-            <span className="vc-questcord-queue-heading" style={HEADING_STYLE}>
-                {t("runFirst")}
-            </span>
-            <div className="vc-questcord-queue-segments">
-                {ORDER_OPTIONS.map((option) => {
-                    const optionLabel = option.value === "videos" ? t("videos") : t("games");
-                    return (
-                        <Button
-                            key={option.value}
-                            size="small"
-                            variant={preference === option.value ? "primary" : "secondary"}
-                            onClick={() => {
-                                (settings.store as { queuePreference?: string }).queuePreference =
-                                    option.value;
-                                forceTick();
-                            }}
-                        >
-                            {optionLabel}
-                        </Button>
-                    );
-                })}
             </div>
 
             <span className="vc-questcord-queue-heading" style={HEADING_STYLE}>
