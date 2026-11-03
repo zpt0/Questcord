@@ -90,10 +90,8 @@ const MOBILE_POPUP_KEYWORDS: readonly string[] = [
     "отсканируйте qr",
     // Japanese
     "携帯",
-    "qr",
     // Korean
     "휴대폰",
-    "qr",
     // Chinese
     "手机",
     "二维码",
@@ -107,6 +105,9 @@ function tryDismissQuestVideo() {
         );
 
         for (const layer of Array.from(candidates)) {
+            // never auto-dismiss vencord's own ui (settings modal, plugin cards, ...)
+            if (layer.closest("[class*='vc-']") || layer.querySelector("[class*='vc-']")) continue;
+
             const text = (layer as HTMLElement).textContent ?? "";
             const lower = text.toLowerCase();
 
