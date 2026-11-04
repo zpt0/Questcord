@@ -29,6 +29,7 @@ import { emitCompanionEvent, COMPANION_EVENT_CODES } from "../core/events";
 
 const MAX_VIDEO_ITERATIONS = 3600;
 const MAX_CONSECUTIVE_VIDEO_ERRORS = 10;
+const MAX_TIME = 25 * 60 * 1000; // 25 minute hard cap
 
 const rnd = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
 
@@ -76,10 +77,17 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
     try {
         let iterations = 0;
         let consecutiveErrors = 0;
+        const startTime = Date.now();
         while (iterations++ < MAX_VIDEO_ITERATIONS) {
             const questData = activeQuests.get(key);
             if (!questData || !questData.isProcessing || isPluginStopping) {
                 removeProgressBar(quest.id, userId);
+                return false;
+            }
+            if (Date.now() - startTime > MAX_TIME) {
+                debugLog(`${LOG_PREFIX} Video quest timed out after 25m`);
+                notify("Quest Timeout", "Video quest timed out after 25 minutes", "error", quest.id);
+                cleanupQuest(quest.id, userId);
                 return false;
             }
             const maxAllowed = Math.floor((Date.now() - enrolledAt) / 1000) + 10;
