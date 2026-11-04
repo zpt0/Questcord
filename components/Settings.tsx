@@ -237,6 +237,11 @@ export function QuestSettings() {
                     label="Achievement bypass"
                     note="Attempt to complete achievement-in-activity quests via OAuth (requires relay on 127.0.0.1:43210)"
                 />
+                <SettingToggle
+                    settingKey="orbQuestsOnly"
+                    label="Orb quests only"
+                    note="Skip quests that don't reward Orbs (Avatar Decoration, In-Game items, etc.)"
+                />
                 <SettingSelect
                     settingKey="activityHeartbeat"
                     label="Activity heartbeat"

@@ -119,6 +119,12 @@ export const settings = definePluginSettings({
         default: false,
         hidden: true,
     },
+    orbQuestsOnly: {
+        type: OptionType.BOOLEAN,
+        description: "Only run quests that reward Orbs (skips quests with other reward types)",
+        default: false,
+        hidden: true,
+    },
 
     debugMode: {
         type: OptionType.BOOLEAN,
