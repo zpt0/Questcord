@@ -21,7 +21,7 @@ import { UserStore } from "@webpack/common";
 import { LOG_PREFIX, SAVED_QUESTS_KEY } from "../constants";
 import { accountReady, getOwner, keyFor, loadOwned } from "../core/account";
 import { settings } from "../settings";
-import { activeQuests, cleanupFunctions, debugLog, getProgressBarKey } from "../core/state";
+import { activeQuests, cleanupFunctions, debugLog, getProgressBarKey, taskFailureCounts } from "../core/state";
 import { suppressConsole, restoreConsole } from "../core/utils";
 import { QuestsStore } from "../core/stores";
 import { discordApiGet, rateLimitedPost } from "../core/api";
@@ -43,11 +43,22 @@ import { completeStreamQuest } from "./stream";
 import { completeVideoQuest } from "./video";
 import { taskControlRegistry } from "./taskControl";
 import { emitCompanionEvent, COMPANION_EVENT_CODES } from "../core/events";
+import { assessQuestRunnability, questBlocker, recordOutcome, QuestOutcome, summarizeRun, summarizeSharedGameQuests, isQuestExpired, UNAUTOMATABLE_KEYS } from "./questRunnability";
 export const SAVED_STATE_KEY = SAVED_QUESTS_KEY;
 
 export const SAVED_STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const autoStartedQuests = new Set<string>();
+
+// Quest outcome tracking (mirrors Orion)
+export const questOutcomes = new Map<string, QuestOutcome>();
+// Quests skipped because Orb-only filter is on
+export const orbFilterSkipped = new Set<string>();
+// Quests skipped because Achievement Bypass was off
+export const consentSkipped = new Set<string>();
+
+const BLACKLISTED_QUEST_ID = "1412491570820812933";
+
 type SessionEndListener = (session: { id: string }) => void;
 const sessionEndListeners = new Set<SessionEndListener>();
 
@@ -425,90 +436,40 @@ export async function startQuest(
                 return "conflict";
             }
         }
-        const expiresAt = quest.config?.expiresAt ?? quest.expiresAt;
-        if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
-            notify("Quest Expired", "This quest has expired", "error");
+        // Check if quest is blacklisted
+        if (questId === BLACKLISTED_QUEST_ID) {
+            notify("Quest Skipped", "This quest is blacklisted", "error", questId);
+            recordOutcome(questOutcomes, questId, "blocked");
             return "invalid";
         }
-        const taskConfig = getTaskConfig(quest);
-        const availableTasks = taskConfig
-            ? ALL_TASK_TYPES.filter((x) => taskConfig?.tasks?.[x] != null)
-            : [];
 
-        // Priority order (matching Orion): ACHIEVEMENT_IN_ACTIVITY > PLAY_ACTIVITY > VIDEO > PLAY_ON_DESKTOP > STREAM
-        // Stream is last because it requires real Go Live + 2nd person in VC (known broken)
-        let taskName: string | null = null;
-        if (availableTasks.length > 0) {
-            if (availableTasks.includes("ACHIEVEMENT_IN_ACTIVITY")) {
-                taskName = "ACHIEVEMENT_IN_ACTIVITY";
-            } else if (availableTasks.includes("PLAY_ACTIVITY")) {
-                taskName = "PLAY_ACTIVITY";
-            } else if (
-                availableTasks.includes("WATCH_VIDEO") ||
-                availableTasks.includes("WATCH_VIDEO_ON_MOBILE") ||
-                availableTasks.includes("WATCH_VIDEO_ON_DESKTOP")
-            ) {
-                taskName = availableTasks.find((t) => t.startsWith("WATCH_VIDEO")) ?? null;
-            } else if (availableTasks.includes("PLAY_ON_DESKTOP")) {
-                taskName = "PLAY_ON_DESKTOP";
-            } else if (availableTasks.includes("STREAM_ON_DESKTOP")) {
-                taskName = "STREAM_ON_DESKTOP";
-            } else {
-                taskName = availableTasks[0];
-            }
-        }
-        if (!taskName) {
-            try {
-                const questDataResp = await discordApiGet(`/quests/${questId}`);
-                const apiQuest = questDataResp?.body ?? questDataResp;
-                if (apiQuest) {
-                    const apiTaskConfig = getTaskConfig(apiQuest);
-                    if (apiTaskConfig) {
-                        const apiAvailableTasks = ALL_TASK_TYPES.filter(
-                            (x) => apiTaskConfig?.tasks?.[x] != null
-                        );
-                        if (apiAvailableTasks.includes("ACHIEVEMENT_IN_ACTIVITY")) {
-                            taskName = "ACHIEVEMENT_IN_ACTIVITY";
-                        } else if (apiAvailableTasks.includes("PLAY_ACTIVITY")) {
-                            taskName = "PLAY_ACTIVITY";
-                        } else if (apiAvailableTasks.find((t) => t.startsWith("WATCH_VIDEO"))) {
-                            taskName =
-                                apiAvailableTasks.find((t) => t.startsWith("WATCH_VIDEO")) ?? null;
-                        } else if (apiAvailableTasks.includes("PLAY_ON_DESKTOP")) {
-                            taskName = "PLAY_ON_DESKTOP";
-                        } else if (apiAvailableTasks.includes("STREAM_ON_DESKTOP")) {
-                            taskName = "STREAM_ON_DESKTOP";
-                        } else {
-                            taskName = apiAvailableTasks[0];
-                        }
-                        if (taskName) {
-                            quest = apiQuest;
-                        }
-                    }
-                }
-            } catch (apiErr) {
-                console.warn(`${LOG_PREFIX} API quest fetch failed:`, apiErr);
-            }
-        }
-        if (!taskName) {
-            debugLog(`${LOG_PREFIX} Quest object keys:`, Object.keys(quest));
-            debugLog(
-                `${LOG_PREFIX} quest.config keys:`,
-                quest.config ? Object.keys(quest.config) : "none"
-            );
-            const taskCfg = getTaskConfig(quest);
-            if (taskCfg && taskCfg.tasks) {
-                debugLog(`${LOG_PREFIX} EXACT TASKS FOUND:`, Object.keys(taskCfg.tasks));
-            } else {
-                debugLog(`${LOG_PREFIX} No tasks object found in config!`, taskCfg);
-            }
-            notify(
-                "Unknown Quest Type",
-                "Could not determine quest type. Try accepting the quest manually first.",
-                "error"
-            );
+        // Check expiry using Discord's own accessor when available
+        if (isQuestExpired(QuestsStore, quest)) {
+            notify("Quest Expired", "This quest has expired", "error");
+            recordOutcome(questOutcomes, questId, "blocked");
             return "invalid";
         }
+
+        // Assess runnability (centralized logic, mirrors Orion's questBlocker)
+        const isDesktopApp = typeof (window as any).DiscordNative !== "undefined";
+        const runnability = assessQuestRunnability(quest, isDesktopApp);
+        const blockReason = questBlocker(runnability);
+
+        if (blockReason) {
+            debugLog(`${LOG_PREFIX} ${blockReason}`);
+            notify("Quest Skipped", blockReason, "info", questId);
+            recordOutcome(questOutcomes, questId, "blocked");
+            return "invalid";
+        }
+
+        const { detected, keys } = runnability;
+        if (!detected) {
+            notify("Unknown Quest Type", "Could not determine quest type. Try accepting the quest manually first.", "error", questId);
+            recordOutcome(questOutcomes, questId, "blocked");
+            return "invalid";
+        }
+
+        const taskName = detected.keyName;
         const finalTaskConfig = getTaskConfig(quest);
 
         const localAppId = resolveApplicationId(quest);
@@ -559,6 +520,7 @@ export async function startQuest(
                 return "conflict";
             }
         }
+
         const targetProgress = finalTaskConfig?.tasks?.[taskName]?.target || 0;
         const questName = getQuestName(quest);
         activeQuests.set(key, {
@@ -576,63 +538,65 @@ export async function startQuest(
         await saveQuestState(questId, taskName);
         createQuestPill(questId, questName);
         if (opts.auto === true) autoStartedQuests.add(questId);
-        const isDesktopApp = typeof (window as any).DiscordNative !== "undefined";
-        switch (taskName) {
-            case "WATCH_VIDEO":
-            case "WATCH_VIDEO_ON_MOBILE":
-            case "WATCH_VIDEO_ON_DESKTOP":
-                await completeVideoQuest(quest, userId);
-                break;
-            case "PLAY_ON_DESKTOP":
-                if (isDesktopApp) {
-                    await completePlayQuest(quest, userId);
-                } else {
-                    notify(
-                        "Desktop Required",
-                        "This quest requires Discord desktop app",
-                        "error",
-                        questId
-                    );
+        let success = false;
+        try {
+            switch (taskName) {
+                case "WATCH_VIDEO":
+                case "WATCH_VIDEO_ON_MOBILE":
+                case "WATCH_VIDEO_ON_DESKTOP":
+                    success = await completeVideoQuest(quest, userId);
+                    break;
+                case "PLAY_ON_DESKTOP":
+                    if (isDesktopApp) {
+                        success = await completePlayQuest(quest, userId);
+                    } else {
+                        notify("Desktop Required", "This quest requires Discord desktop app", "error", questId);
+                        cleanupQuest(questId, userId);
+                        return "invalid";
+                    }
+                    break;
+                case "STREAM_ON_DESKTOP":
+                    if (isDesktopApp) {
+                        success = await completeStreamQuest(quest, userId);
+                    } else {
+                        notify("Desktop Required", "This quest requires Discord desktop app", "error", questId);
+                        cleanupQuest(questId, userId);
+                        return "invalid";
+                    }
+                    break;
+                case "ACHIEVEMENT_IN_ACTIVITY":
+                    if (settings.store.enableAchievementBypass) {
+                        success = await completeActivityQuest(quest, userId);
+                    } else {
+                        consentSkipped.add(questId);
+                        notify(
+                            "Achievement Bypass Off",
+                            "Enable 'Achievement Bypass' in settings to attempt this quest.",
+                            "info",
+                            questId
+                        );
+                        cleanupQuest(questId, userId);
+                        return "invalid";
+                    }
+                    break;
+                case "PLAY_ACTIVITY":
+                    success = await completeActivityQuest(quest, userId);
+                    break;
+                default:
+                    console.warn(`${LOG_PREFIX} Unknown task type: ${taskName}`);
+                    notify("Unknown Quest Type", `Unsupported task: ${taskName}`, "error", questId);
                     cleanupQuest(questId, userId);
                     return "invalid";
-                }
-                break;
-            case "STREAM_ON_DESKTOP":
-                if (isDesktopApp) {
-                    await completeStreamQuest(quest, userId);
-                } else {
-                    notify(
-                        "Desktop Required",
-                        "This quest requires Discord desktop app",
-                        "error",
-                        questId
-                    );
-                    cleanupQuest(questId, userId);
-                    return "invalid";
-                }
-                break;
-            case "ACHIEVEMENT_IN_ACTIVITY":
-                if (settings.store.enableAchievementBypass) {
-                    await completeActivityQuest(quest, userId);
-                } else {
-                    notify(
-                        "Unsupported Quest",
-                        "This quest requires in-game achievements. Enable 'Achievement Bypass' in settings to attempt automation.",
-                        "error",
-                        questId
-                    );
-                    cleanupQuest(questId, userId);
-                    return "invalid";
-                }
-                break;
-            case "PLAY_ACTIVITY":
-                await completeActivityQuest(quest, userId);
-                break;
-            default:
-                console.warn(`${LOG_PREFIX} Unknown task type: ${taskName}`);
-                notify("Unknown Quest Type", `Unsupported task: ${taskName}`, "error", questId);
-                cleanupQuest(questId, userId);
-                return "invalid";
+            }
+        } catch (taskError) {
+            console.error(`${LOG_PREFIX} Task execution error:`, taskError);
+            success = false;
+        }
+
+        if (success) {
+            recordOutcome(questOutcomes, questId, "completed");
+        } else {
+            recordOutcome(questOutcomes, questId, "failed");
         }
         return "started";
     } catch (error) {
@@ -641,4 +605,60 @@ export async function startQuest(
         cleanupQuest(questId, userId);
         return "error";
     }
+}
+
+/**
+ * Retry quests that were skipped because Achievement Bypass was off.
+ * Call this when the setting is turned on.
+ */
+export function retryConsentSkipped(): number {
+    let restored = 0;
+    for (const id of consentSkipped) {
+        if (!questOutcomes.has(id)) continue;
+        questOutcomes.delete(id);
+        restored++;
+    }
+    consentSkipped.clear();
+    return restored;
+}
+
+/**
+ * Retry quests that were filtered out by Orb-only setting.
+ * Call this when the setting is turned off.
+ */
+export function retryOrbFilterSkipped(): number {
+    let restored = 0;
+    for (const id of orbFilterSkipped) {
+        if (!questOutcomes.has(id)) continue;
+        questOutcomes.delete(id);
+        restored++;
+    }
+    orbFilterSkipped.clear();
+    return restored;
+}
+
+/**
+ * Get a summary of the current run outcomes.
+ */
+export function getRunSummary(): ReturnType<typeof summarizeRun> {
+    return summarizeRun(questOutcomes);
+}
+
+/**
+ * Get shared game quest deduplication lines for the wrap-up.
+ */
+export function getSharedGameQuestLines(): string[] {
+    const tasks: Array<{ appId: string | number; name: string; type: string }> = [];
+    for (const [, data] of activeQuests.entries()) {
+        if (data.taskType === "PLAY_ON_DESKTOP") {
+            const q = QuestsStore?.getQuest(data.questId);
+            if (q) {
+                const appId = resolveApplicationId(q);
+                if (appId) {
+                    tasks.push({ appId, name: getQuestName(q), type: "GAME" });
+                }
+            }
+        }
+    }
+    return summarizeSharedGameQuests(tasks);
 }
