@@ -50,7 +50,7 @@ export const SAVED_STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const autoStartedQuests = new Set<string>();
 
-// Quest outcome tracking (mirrors Orion)
+// Quest outcome tracking
 export const questOutcomes = new Map<string, QuestOutcome>();
 // Quests skipped because Orb-only filter is on
 export const orbFilterSkipped = new Set<string>();
@@ -450,7 +450,7 @@ export async function startQuest(
             return "invalid";
         }
 
-        // Assess runnability (centralized logic, mirrors Orion's questBlocker)
+        // Assess runnability (centralized logic with questBlocker)
         const isDesktopApp = typeof (window as any).DiscordNative !== "undefined";
         const runnability = assessQuestRunnability(quest, isDesktopApp);
         const blockReason = questBlocker(runnability);

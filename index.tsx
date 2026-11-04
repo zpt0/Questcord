@@ -25,7 +25,7 @@ import { QuestSettings } from "./components/Settings";
 import { showUpdateModal } from "./components/UpdateModal";
 import { PLUGIN_VERSION, UPDATE_CHECK_URL, UPDATE_CHECK_ENABLED, LOG_PREFIX } from "./constants";
 import { compareVersions } from "./core/utils";
-import { initializeStores, API } from "./core/stores";
+import { initializeStores, API, QuestsStore } from "./core/stores";
 import { getOwner, markQuestsLoaded, setOwner } from "./core/account";
 import { currentUserId } from "./core/user";
 import type { Quest } from "./core/types";
@@ -46,7 +46,11 @@ import {
     cancelAll,
     cancelQuest,
     checkAndResumeQuests,
+    getRunSummary,
+    getSharedGameQuestLines,
     resetResume,
+    retryConsentSkipped,
+    retryOrbFilterSkipped,
     startQuest,
 } from "./quests/manager";
 import { scheduleTick, startQueue, stopQueue, toggleQueued } from "./quests/queue/runner";
@@ -287,6 +291,28 @@ export default definePlugin({
         setPluginStopping(false);
         resetResume();
 
+        // Listen for setting changes to retry skipped quests
+        settings.onChange("orbQuestsOnly", (value: boolean) => {
+            if (!value) {
+                const restored = retryOrbFilterSkipped();
+                if (restored > 0) {
+                    debugLog(`${LOG_PREFIX} Orb-only filter disabled, restored ${restored} quest(s)`);
+                    notify("Orb Filter Off", `${restored} quest(s) re-added to queue`, "info");
+                    void startQueue().then(() => scheduleTick());
+                }
+            }
+        });
+        settings.onChange("enableAchievementBypass", (value: boolean) => {
+            if (value) {
+                const restored = retryConsentSkipped();
+                if (restored > 0) {
+                    debugLog(`${LOG_PREFIX} Achievement bypass enabled, restored ${restored} quest(s)`);
+                    notify("Achievement Bypass On", `${restored} quest(s) re-added to queue`, "info");
+                    void startQueue().then(() => scheduleTick());
+                }
+            }
+        });
+
         // discord fills its quest stores lazily, so the resume check runs staged with retries
         setTimeout(() => {
             if (initializeStores()) {
@@ -298,14 +324,38 @@ export default definePlugin({
                 knownAccountId = currentUserId();
                 setupQuestVideoAutoDismiss();
                 debugLog(`${LOG_PREFIX} Ready!`);
-                void startQueue();
-                setTimeout(() => {
-                    void checkAndResumeQuests()
-                        .catch((err) => {
-                            console.warn(`${LOG_PREFIX} Resume check failed:`, err);
-                        })
-                        .finally(() => scheduleTick());
-                }, 3000);
+                
+                // Wait for QuestStore to be populated before first run
+                // Vencord starts plugins before Discord fetches quests; an empty store looks like "all done"
+                const waitForQuests = async () => {
+                    const maxWait = 25000;
+                    const start = Date.now();
+                    while (Date.now() - start < maxWait) {
+                        const store = QuestsStore;
+                        if (store && typeof store.getQuests === "function") {
+                            const quests = store.getQuests();
+                            if (quests && Object.keys(quests).length > 0) {
+                                debugLog(`${LOG_PREFIX} Quest list arrived after ${Date.now() - start}ms, ${Object.keys(quests).length} quest(s)`);
+                                break;
+                            }
+                        }
+                        await new Promise(r => setTimeout(r, 200));
+                    }
+                    // Even if empty, don't treat as "all completed" - just proceed
+                    debugLog(`${LOG_PREFIX} Proceeding with engine start`);
+                };
+                
+                void waitForQuests().then(() => {
+                    void startQueue();
+                    setTimeout(() => {
+                        void checkAndResumeQuests()
+                            .catch((err) => {
+                                console.warn(`${LOG_PREFIX} Resume check failed:`, err);
+                            })
+                            .finally(() => scheduleTick());
+                    }, 3000);
+                });
+                
                 lateResume = setTimeout(() => {
                     void checkAndResumeQuests()
                         .catch(() => {})

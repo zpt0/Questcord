@@ -32,13 +32,14 @@ import { emitCompanionEvent, COMPANION_EVENT_CODES } from "../core/events";
 import { taskControlRegistry } from "./taskControl";
 
 const MAX_ACTIVITY_ITERATIONS = 3600;
+const MAX_TIME = 25 * 60 * 1000; // 25 minute hard cap
 
 const MAX_CONSECUTIVE_HEARTBEAT_ERRORS = 5;
 const HEARTBEAT_RETRY_BASE_DELAY_MS = 2000;
 const TERMINAL_HEARTBEAT_ATTEMPTS = 3;
 const TERMINAL_HEARTBEAT_RETRY_DELAY_MS = 2000;
 
-// Helper to read progress from both Map and object formats (like Orion)
+// Helper to read progress from both Map and object formats
 function readProgress(userStatus: any, key: string): number {
     const p = userStatus?.progress;
     const entry = p instanceof Map ? p.get(key) : p?.[key];
@@ -129,6 +130,7 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
         let iterations = 0;
         let consecutiveErrors = 0;
         let cur = readProgress(quest.userStatus, taskName);
+        const startTime = Date.now();
 
         emitCompanionEvent({
             code: COMPANION_EVENT_CODES.TASK_STARTED,
@@ -156,6 +158,12 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
             }
             if (!taskControlRegistry.isActive(quest.id, generation)) {
                 removeProgressBar(quest.id, userId);
+                return false;
+            }
+            if (Date.now() - startTime > MAX_TIME) {
+                debugLog(`${LOG_PREFIX} Activity quest timed out after 25m`);
+                notify("Quest Timeout", "Activity quest timed out after 25 minutes", "error", quest.id);
+                cleanupQuest(quest.id, userId);
                 return false;
             }
             try {

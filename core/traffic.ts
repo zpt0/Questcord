@@ -18,6 +18,7 @@
 
 import { debugLog } from "./state";
 import { LOG_PREFIX } from "../constants";
+import { emitCompanionEvent, COMPANION_EVENT_CODES, companionFailure } from "../core/events";
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 const rnd = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -70,6 +71,56 @@ function cancelledError(): Error {
 
 function questIdFromUrl(url: string): string | undefined {
     return url.match(/^\/quests\/(\d+)(?:\/|$)/)?.[1];
+}
+
+function emitNetworkRetry(req: QueuedRequest, err: ClassifiedError): void {
+    const actualAttempt = req.attempts + 1;
+    const statusText = err.status != null ? ` after HTTP ${err.status}` : "";
+    emitCompanionEvent({
+        code: COMPANION_EVENT_CODES.NETWORK_RETRY,
+        category: "network",
+        level: "warning",
+        message: `Quest request attempt ${actualAttempt} failed${statusText}; will retry.`,
+        questId: questIdFromUrl(req.url),
+        failure: companionFailure({
+            terminal: false,
+            retryable: true,
+            attempt: actualAttempt,
+            maxAttempts: MAX_ATTEMPTS,
+            httpStatus: err.status,
+            upstreamCode: err.upstreamCode,
+            reason: err.message,
+        }),
+    });
+}
+
+function emitNetworkFailure(req: QueuedRequest, err: ClassifiedError): void {
+    const actualAttempt = req.attempts + 1;
+    const exhaustedRetry = err.isRetryable && req.attempts >= MAX_RETRIES;
+    const statusText = err.status != null ? ` (HTTP ${err.status})` : "";
+    emitCompanionEvent({
+        code: COMPANION_EVENT_CODES.NETWORK_FAILED,
+        category: "network",
+        level: exhaustedRetry || !err.isClientError ? "error" : "warning",
+        message: exhaustedRetry
+            ? `Quest request failed after ${actualAttempt} attempts${statusText}.`
+            : `Quest request failed${statusText}.`,
+        questId: questIdFromUrl(req.url),
+        failure: companionFailure({
+            terminal: true,
+            retryable: err.isRetryable,
+            attempt: actualAttempt,
+            maxAttempts: err.isRetryable ? MAX_ATTEMPTS : actualAttempt,
+            httpStatus: err.status,
+            upstreamCode: err.upstreamCode,
+            reason: err.message,
+        }),
+    });
+}
+
+export function isSkippableQuest(error: any): boolean {
+    const status = error?.status;
+    return status === 404 || status === 403 || status === 410;
 }
 
 export class Traffic {
@@ -184,6 +235,7 @@ export class Traffic {
                 const err = classify(e);
 
                 if (err.isRetryable && req.attempts < MAX_RETRIES) {
+                    emitNetworkRetry(req, err);
                     req.attempts++;
                     const delay = (e.body?.retry_after ?? Math.pow(2, req.attempts)) * 1000;
                     const isGlobal = e.body?.global === true;
@@ -209,9 +261,11 @@ export class Traffic {
                     }
                 } else if (err.isClientError) {
                     debugLog(`${LOG_PREFIX} [Traffic] HTTP ${err.status}: ${req.url}`);
+                    emitNetworkFailure(req, err);
                     this.settleReject(req, e);
                 } else {
                     debugLog(`${LOG_PREFIX} [Traffic] Request to ${req.url} failed: ${err.message}`);
+                    emitNetworkFailure(req, err);
                     this.settleReject(req, e);
                 }
             }

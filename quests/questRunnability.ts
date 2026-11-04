@@ -64,7 +64,7 @@ export interface TaskFamilyRule {
 }
 
 /**
- * Task family order matching Orion:
+ * Task family order (ACHIEVEMENT_IN_ACTIVITY > PLAY_ACTIVITY > VIDEO > PLAY_ON_DESKTOP > STREAM):
  * ACHIEVEMENT_IN_ACTIVITY > PLAY_ACTIVITY > VIDEO > PLAY_ON_DESKTOP > STREAM
  */
 export const TASK_FAMILY_ORDER: TaskFamilyRule[] = [
