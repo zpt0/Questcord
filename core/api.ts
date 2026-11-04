@@ -18,11 +18,13 @@
 
 import { findByPropsLazy } from "@webpack";
 import { LOG_PREFIX } from "../constants";
+import { Traffic } from "./traffic";
+import { debugLog } from "./state";
+
 const AuthStore = findByPropsLazy("getToken");
 export function getDiscordToken(): string {
     try {
         const token = AuthStore?.getToken?.();
-        // tokens are always long; a short value means the store isn't ready
         if (typeof token === "string" && token.length > 50) {
             return token;
         }
@@ -39,131 +41,55 @@ interface ApiError extends Error {
     retryAfter?: number;
 }
 
-const MAX_RETRIES = 5;
-const BASE_DELAY_MS = 2000;
-const MAX_RATE_LIMIT_DELAY_MS = 15000;
-const MAX_ERROR_DELAY_MS = 10000;
-const JITTER_MS = 500;
+let trafficInstance: Traffic | null = null;
+let isEngineRunning = false;
 
-function sleep(ms: number): Promise<void> {
-    return new Promise((r) => setTimeout(r, ms));
+export function setTrafficEngineRunning(running: boolean): void {
+    isEngineRunning = running;
 }
 
-function computeBackoffDelay(attempt: number, capMs: number): number {
-    const backoff = Math.min(BASE_DELAY_MS * (attempt + 1), capMs);
-    return backoff + Math.floor(Math.random() * JITTER_MS);
+export function getTrafficInstance(): Traffic | null {
+    return trafficInstance;
 }
 
-function parseRetryAfterMs(response: Response): number | null {
-    const header = response.headers.get("retry-after");
-    if (!header) return null;
-    const seconds = parseFloat(header);
-    if (isNaN(seconds) || seconds < 0) return null;
-    return seconds * 1000;
-}
-
-function getErrorStatus(error: any): number | undefined {
-    // fetch errors carry status directly; discord's client nests it under response
-    return error?.status ?? error?.response?.status;
-}
-
-function isRateLimitError(error: any): boolean {
-    return (
-        getErrorStatus(error) === 429 ||
-        (typeof error?.message === "string" && error.message.includes("rate limit"))
-    );
-}
-
-interface RetryDecision {
-    shouldRetry: boolean;
-    waitMs: number;
-    reason: string;
-}
-
-function decideRetry(error: any, attempt: number, maxRetries: number): RetryDecision {
-    const status = getErrorStatus(error);
-
-    // 404 = resource not found - retrying won't help, fail fast
-    if (status === 404) {
-        return { shouldRetry: false, waitMs: 0, reason: "" };
+export function initializeTraffic(API: any): Traffic {
+    if (!trafficInstance) {
+        trafficInstance = new Traffic(API, () => isEngineRunning);
     }
-    // 403 = forbidden - retrying won't help, fail fast
-    if (status === 403) {
-        return { shouldRetry: false, waitMs: 0, reason: "" };
-    }
-    if (status != null && status < 500 && status !== 429) {
-        return { shouldRetry: false, waitMs: 0, reason: "" };
-    }
-    if (attempt >= maxRetries - 1) {
-        return { shouldRetry: false, waitMs: 0, reason: "" };
-    }
-    if (isRateLimitError(error)) {
-        return {
-            shouldRetry: true,
-            waitMs: error?.retryAfter ?? computeBackoffDelay(attempt, MAX_RATE_LIMIT_DELAY_MS),
-            reason: "Rate limited",
-        };
-    }
-    if (status == null) {
-        return {
-            shouldRetry: true,
-            waitMs: computeBackoffDelay(attempt, MAX_ERROR_DELAY_MS),
-            reason: "Network error",
-        };
-    }
-    return {
-        shouldRetry: true,
-        waitMs: computeBackoffDelay(attempt, MAX_ERROR_DELAY_MS),
-        reason: `Server error ${status}`,
-    };
+    return trafficInstance;
 }
 
-export async function discordApiGet(endpoint: string, maxRetries = MAX_RETRIES): Promise<any> {
+export async function discordApiGet(endpoint: string): Promise<any> {
     const token = getDiscordToken();
     if (!token) throw new Error("No Discord token available");
-    let lastError: any = new Error("Max retries exceeded");
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-            const response = await fetch(`/api/v9${endpoint}`, {
-                method: "GET",
-                headers: {
-                    Authorization: token,
-                    "Content-Type": "application/json",
-                },
-            });
-            if (!response.ok) {
-                const error: ApiError = new Error(`API GET failed: ${response.status}`);
-                error.status = response.status;
-                if (response.status === 429) {
-                    const retryAfter = parseRetryAfterMs(response);
-                    if (retryAfter != null) error.retryAfter = retryAfter;
-                }
-                // extract Discord error message from body
-                try {
-                    const bodyText = await response.text();
-                    if (bodyText) {
-                        try {
-                            const parsed = JSON.parse(bodyText);
-                            if (parsed?.message) error.message = parsed.message;
-                        } catch {
-                            error.message = bodyText;
-                        }
-                    }
-                } catch {}
-                throw error;
-            }
-            return response.json();
-        } catch (error: any) {
-            lastError = error;
-            const { shouldRetry, waitMs, reason } = decideRetry(error, attempt, maxRetries);
-            if (!shouldRetry) throw error;
-            console.warn(
-                `${LOG_PREFIX} ${reason}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries}): ${error?.message}`
-            );
-            await sleep(waitMs);
+    const response = await fetch(`/api/v9${endpoint}`, {
+        method: "GET",
+        headers: {
+            Authorization: token,
+            "Content-Type": "application/json",
+        },
+    });
+    if (!response.ok) {
+        const error: ApiError = new Error(`API GET failed: ${response.status}`);
+        error.status = response.status;
+        if (response.status === 429) {
+            const retryAfter = parseRetryAfterMs(response);
+            if (retryAfter != null) error.retryAfter = retryAfter;
         }
+        try {
+            const bodyText = await response.text();
+            if (bodyText) {
+                try {
+                    const parsed = JSON.parse(bodyText);
+                    if (parsed?.message) error.message = parsed.message;
+                } catch {
+                    error.message = bodyText;
+                }
+            }
+        } catch {}
+        throw error;
     }
-    throw lastError;
+    return response.json();
 }
 
 export async function discordApiPost(endpoint: string, body: any): Promise<any> {
@@ -188,12 +114,10 @@ export async function discordApiPost(endpoint: string, body: any): Promise<any> 
         const error: ApiError = new Error(`API POST failed: ${response.status}`);
         error.status = response.status;
         error.body = errorBody;
-        // extract the Discord error message from the JSON body if available
         try {
             const parsed = JSON.parse(errorBody);
             if (parsed?.message) error.message = parsed.message;
         } catch {
-            // not JSON, keep the raw body as the message
             if (errorBody) error.message = errorBody;
         }
         if (response.status === 429) {
@@ -209,21 +133,24 @@ export async function discordApiPost(endpoint: string, body: any): Promise<any> 
 export async function rateLimitedPost(
     endpoint: string,
     body: any,
-    maxRetries = MAX_RETRIES
+    isActive: () => boolean = () => true,
+    signal?: AbortSignal,
 ): Promise<any> {
-    let lastError: any = new Error("Max retries exceeded");
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-            return await discordApiPost(endpoint, body);
-        } catch (error: any) {
-            lastError = error;
-            const { shouldRetry, waitMs, reason } = decideRetry(error, attempt, maxRetries);
-            if (!shouldRetry) throw error;
-            console.warn(
-                `${LOG_PREFIX} ${reason}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries}): ${error?.message}`
-            );
-            await sleep(waitMs);
-        }
+    if (!trafficInstance) {
+        debugLog(`${LOG_PREFIX} Traffic not initialized, falling back to direct post`);
+        return discordApiPost(endpoint, body);
     }
-    throw lastError;
+    return trafficInstance.enqueue(endpoint, body, isActive, signal);
+}
+
+function parseRetryAfterMs(response: Response): number | null {
+    const header = response.headers.get("retry-after");
+    if (!header) return null;
+    const seconds = parseFloat(header);
+    if (isNaN(seconds) || seconds < 0) return null;
+    return seconds * 1000;
+}
+
+export function clearTrafficQueue(): void {
+    trafficInstance?.clear();
 }

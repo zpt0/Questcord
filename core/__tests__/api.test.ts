@@ -4,7 +4,8 @@ vi.mock("@webpack", () => ({
     findByPropsLazy: () => ({ getToken: () => "a".repeat(60) }),
 }));
 
-import { discordApiGet, rateLimitedPost } from "../api";
+import { discordApiGet, rateLimitedPost, initializeTraffic } from "../api";
+import { Traffic } from "../traffic";
 
 function stubResponse(data: any, status = 200, retryAfter?: string) {
     return {
@@ -23,7 +24,7 @@ function fetchMock() {
     return globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
 }
 
-describe("discordApiGet retry", () => {
+describe("discordApiGet", () => {
     beforeEach(() => {
         vi.useFakeTimers();
         vi.stubGlobal("fetch", vi.fn());
@@ -36,45 +37,43 @@ describe("discordApiGet retry", () => {
         vi.restoreAllMocks();
     });
 
-    it("retries 429 with Retry-After header then succeeds", async () => {
-        fetchMock()
-            .mockResolvedValueOnce(stubResponse({ error: "slow down" }, 429, "1"))
-            .mockResolvedValueOnce(stubResponse({ body: { id: "q1" } }, 200));
-        const promise = discordApiGet("/quests/q1", 3);
-        await vi.advanceTimersByTimeAsync(5000);
-        await expect(promise).resolves.toEqual({ body: { id: "q1" } });
-        expect(fetchMock()).toHaveBeenCalledTimes(2);
+    it("returns data on 200", async () => {
+        fetchMock().mockResolvedValueOnce(stubResponse({ body: { id: "q1" } }, 200));
+        const result = await discordApiGet("/quests/q1");
+        expect(result).toEqual({ body: { id: "q1" } });
+        expect(fetchMock()).toHaveBeenCalledTimes(1);
     });
 
-    it("does not retry 403 errors", async () => {
+    it("throws on 403 without retry", async () => {
         fetchMock().mockResolvedValueOnce(stubResponse({}, 403));
-        await expect(discordApiGet("/quests/q1", 3)).rejects.toMatchObject({
+        await expect(discordApiGet("/quests/q1")).rejects.toMatchObject({
             status: 403,
         });
         expect(fetchMock()).toHaveBeenCalledTimes(1);
     });
 
-    it("retries network errors then succeeds", async () => {
-        fetchMock()
-            .mockRejectedValueOnce(new Error("fetch failed"))
-            .mockResolvedValueOnce(stubResponse({ ok: true }, 200));
-        const promise = discordApiGet("/quests/q1", 3);
-        await vi.advanceTimersByTimeAsync(30000);
-        await expect(promise).resolves.toEqual({ ok: true });
-        expect(fetchMock()).toHaveBeenCalledTimes(2);
+    it("throws on 429 without retry (retry logic moved to Traffic)", async () => {
+        fetchMock().mockResolvedValueOnce(stubResponse({ error: "slow down" }, 429, "1"));
+        await expect(discordApiGet("/quests/q1")).rejects.toMatchObject({
+            status: 429,
+        });
+        expect(fetchMock()).toHaveBeenCalledTimes(1);
     });
 
-    it("throws after exhausting retries on 500", async () => {
-        fetchMock().mockResolvedValue(stubResponse({}, 500));
-        const promise = discordApiGet("/quests/q1", 2);
-        const assertion = expect(promise).rejects.toMatchObject({ status: 500 });
-        await vi.advanceTimersByTimeAsync(30000);
-        await assertion;
-        expect(fetchMock()).toHaveBeenCalledTimes(2);
+    it("throws on network error", async () => {
+        fetchMock().mockRejectedValueOnce(new Error("fetch failed"));
+        await expect(discordApiGet("/quests/q1")).rejects.toThrow("fetch failed");
+        expect(fetchMock()).toHaveBeenCalledTimes(1);
+    });
+
+    it("throws on 500", async () => {
+        fetchMock().mockResolvedValueOnce(stubResponse({}, 500));
+        await expect(discordApiGet("/quests/q1")).rejects.toMatchObject({ status: 500 });
+        expect(fetchMock()).toHaveBeenCalledTimes(1);
     });
 });
 
-describe("rateLimitedPost retry", () => {
+describe("rateLimitedPost (uses Traffic queue)", () => {
     beforeEach(() => {
         vi.useFakeTimers();
         vi.stubGlobal("fetch", vi.fn());
@@ -88,21 +87,20 @@ describe("rateLimitedPost retry", () => {
         vi.restoreAllMocks();
     });
 
-    it("retries 429 then succeeds", async () => {
-        fetchMock()
-            .mockResolvedValueOnce(stubResponse({ error: "slow" }, 429, "1"))
-            .mockResolvedValueOnce(stubResponse({}, 200));
-        const promise = rateLimitedPost("/quests/q1/enroll", { location: 2 }, 3);
+    it("queues request when engine is running", async () => {
+        const mockAPI = { post: vi.fn().mockResolvedValue({}) };
+        const traffic = initializeTraffic(mockAPI);
+        (traffic as any).isRunning = () => true;
+        const promise = rateLimitedPost("/quests/q1/enroll", { location: 2 });
         await vi.advanceTimersByTimeAsync(5000);
         await expect(promise).resolves.toEqual({});
-        expect(fetchMock()).toHaveBeenCalledTimes(2);
+        expect(mockAPI.post).toHaveBeenCalledTimes(1);
     });
 
-    it("throws immediately on 401 without retry", async () => {
-        fetchMock().mockResolvedValueOnce(stubResponse({}, 401));
-        await expect(rateLimitedPost("/quests/q1/enroll", {}, 3)).rejects.toMatchObject({
-            status: 401,
-        });
-        expect(fetchMock()).toHaveBeenCalledTimes(1);
+    it("traffic queue rejects when engine stopped", async () => {
+        const mockAPI = { post: vi.fn().mockResolvedValue({}) };
+        const traffic = initializeTraffic(mockAPI);
+        (traffic as any).isRunning = () => false;
+        await expect(rateLimitedPost("/quests/q1/enroll", { location: 2 })).rejects.toThrow("Stopped");
     });
 });

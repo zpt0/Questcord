@@ -26,6 +26,11 @@ export const ApplicationStreamingStore = findStoreLazy("ApplicationStreamingStor
 export const ChannelStore = findStoreLazy("ChannelStore");
 export const GuildChannelStore = findStoreLazy("GuildChannelStore");
 export const api = findByPropsLazy("get", "post", "put", "patch");
+export const API = {
+    get: (options: { url: string }) => api?.get(options),
+    post: (options: { url: string; body: any; query?: any }) => api?.post(options),
+    del: (options: { url: string }) => api?.del(options),
+};
 function getWebpackRequire(): any {
     try {
         const webpackChunk = (window as any).webpackChunkdiscord_app;
