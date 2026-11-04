@@ -17,7 +17,7 @@
  */
 
 export interface TaskConfig {
-    tasks: Record<string, { target: number }>;
+    tasks: Record<string, { target: number; applications?: Array<{ id?: string; name?: string }> }>;
 }
 
 export interface QuestProgress {
@@ -109,6 +109,22 @@ export function getTaskConfig(quest: Quest): TaskConfig | null {
 }
 
 export function resolveApplicationId(quest: Quest): string | null {
+    // Discord moved the app id to per-task config in July 2026
+    // Priority: taskConfigV2 > taskConfig > legacy paths
+    const taskConfigs = [
+        quest.config?.taskConfigV2,
+        quest.config?.taskConfig,
+        quest.taskConfigV2,
+        quest.taskConfig,
+    ];
+    for (const tc of taskConfigs) {
+        if (tc?.tasks) {
+            for (const t of Object.values(tc.tasks)) {
+                const apps = (t as any)?.applications;
+                if (Array.isArray(apps) && apps[0]?.id) return apps[0].id;
+            }
+        }
+    }
     return (
         quest.config?.application?.id ??
         quest.config?.applicationId ??
