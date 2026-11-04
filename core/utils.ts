@@ -220,6 +220,36 @@ export function parseReleaseInline(text: string): ReleaseInlineNode[] {
     return nodes;
 }
 
+export function pickExecutable(
+    executables: unknown,
+    cleanName: string
+): { exeName: string; relPath: string } {
+    const loose = (v: string): string => v.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    const fallbackExe = `${cleanName.replace(/\s+/g, "")}.exe`;
+
+    const win32 = (Array.isArray(executables) ? executables : [])
+        .filter((x: any) => x?.os === "win32" && typeof x.name === "string" && x.name.length > 0)
+        .map((x: any) => String(x.name).replace(">", "").replace(/\\/g, "/"));
+    if (win32.length === 0) return { exeName: fallbackExe, relPath: `${cleanName}/${fallbackExe}` };
+
+    const rank = (n: string): string =>
+        [
+            /(^|[-_./ ])test([-_. ]|\.exe$)/i.test(n) ? "1" : "0",
+            /launcher/i.test(n) ? "1" : "0",
+            n.includes("/") ? "1" : "0",
+            n,
+        ].join("");
+    const chosen = win32
+        .slice()
+        .sort((a, b) => (rank(a) < rank(b) ? -1 : rank(a) > rank(b) ? 1 : 0))[0];
+    const parts = chosen.split("/").filter(Boolean);
+    const exeName = parts[parts.length - 1];
+    const dirs = parts.slice(0, -1);
+
+    const alreadyRooted = dirs.length > 0 && loose(dirs[0]) === loose(cleanName);
+    return { exeName, relPath: (alreadyRooted ? parts : [cleanName, ...parts]).join("/") };
+}
+
 export function parseReleaseBlocks(notes: string): ReleaseBlockNode[] {
     const normalized = (notes || "").replace(/\r\n/g, "\n").trim();
     if (!normalized) return [];

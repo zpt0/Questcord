@@ -23,6 +23,7 @@ export let activeQuests = new Map<string, QuestData>();
 export let progressBars = new Map<string, HTMLElement>();
 export let cleanupFunctions = new Map<string, Array<() => void>>();
 export let isPluginStopping = false;
+export const taskFailureCounts = new Map<string, number>();
 export function setPluginStopping(value: boolean) {
     isPluginStopping = value;
 }

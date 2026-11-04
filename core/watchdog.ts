@@ -23,7 +23,7 @@ import { getQuestName } from "./types";
 import { notify } from "../ui/notifications";
 
 export const STALL_CHECK_INTERVAL_MS = 60_000;
-export const DEFAULT_STALL_TIMEOUT_MS = 10 * 60_000;
+export const DEFAULT_STALL_TIMEOUT_MS = 90_000;
 
 // restart at most once; a repeated stall means discord changed the api, not a transient hang
 export const MAX_STALL_RESTARTS = 1;
