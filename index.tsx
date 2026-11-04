@@ -25,7 +25,7 @@ import { QuestSettings } from "./components/Settings";
 import { showUpdateModal } from "./components/UpdateModal";
 import { PLUGIN_VERSION, UPDATE_CHECK_URL, UPDATE_CHECK_ENABLED, LOG_PREFIX } from "./constants";
 import { compareVersions } from "./core/utils";
-import { initializeStores } from "./core/stores";
+import { initializeStores, API } from "./core/stores";
 import { getOwner, markQuestsLoaded, setOwner } from "./core/account";
 import { currentUserId } from "./core/user";
 import type { Quest } from "./core/types";
@@ -54,12 +54,40 @@ import { isQueueable } from "./quests/queue/order";
 import { isQueued, unloadQueue } from "./quests/queue/store";
 import { DEFAULT_STALL_TIMEOUT_MS, startStallWatchdog, stopStallWatchdog } from "./core/watchdog";
 import { settings } from "./settings";
+import { initializeTraffic, setTrafficEngineRunning, clearTrafficQueue } from "./core/api";
+import { taskControlRegistry } from "./quests/taskControl";
+import { scheduler } from "./quests/scheduler";
+import { emitCompanionEvent, COMPANION_EVENT_CODES } from "./core/events";
+
+const MENU_ANCHORS = ["share-link", "play-game", "display-disclosure"];
 
 let lateResume: ReturnType<typeof setTimeout> | undefined;
+let knownAccountId: string | null = null;
+let pendingEnrollmentWake = false;
 
-// quest context menu ids, the queue entry is inserted next to them
-// if discord renames them the queue entry silently stops showing up
-const MENU_ANCHORS = ["share-link", "play-game", "display-disclosure"];
+function clearEnrollmentWake(): void {
+    pendingEnrollmentWake = false;
+}
+
+function scheduleEnrollmentWake(): void {
+    if (!settings.store.watchForEnrollments) return;
+    if (pendingEnrollmentWake) return;
+    pendingEnrollmentWake = true;
+    setTimeout(() => {
+        pendingEnrollmentWake = false;
+        if (settings.store.watchForEnrollments && !isAnyRunning()) {
+            debugLog(`${LOG_PREFIX} Quest enrollment detected, starting engine`);
+            void startQueue().then(() => scheduleTick());
+        }
+    }, 150);
+}
+
+function isAnyRunning(): boolean {
+    for (const data of activeQuests.values()) {
+        if (data.isProcessing) return true;
+    }
+    return false;
+}
 
 function ensureStyleRootMounted() {
     // vencord mounts its style root on DOMContentLoaded only, plugins that start
@@ -134,16 +162,44 @@ export function leaveAccount() {
     stopQueue();
     unloadQueue();
     cancelAll();
+    taskControlRegistry.cancelAll();
+    taskControlRegistry.clear();
     cleanupAllPills();
     resetResume();
+    scheduler.clear();
     setOwner(null);
 }
 
 export function enterAccount(userId: string) {
     debugLog(`${LOG_PREFIX} Account switch: entering ${userId}`);
+    
+    // Clear pending enrollment wake from previous account
+    pendingEnrollmentWake = false;
+    
+    // Track account ID for switch detection
+    if (knownAccountId && knownAccountId !== userId) {
+        debugLog(`${LOG_PREFIX} Account changed from ${knownAccountId} to ${userId}`);
+        emitCompanionEvent({
+            code: COMPANION_EVENT_CODES.ACCOUNT_SWITCHED,
+            category: "account",
+            level: "info",
+            message: `Account switched to ${userId}`,
+        });
+    }
+    knownAccountId = userId;
+    
     setOwner(userId);
     resetResume();
     void startQueue().then(() => scheduleTick());
+    
+    if (settings.store.autoStart) {
+        setTimeout(() => {
+            if (!isAnyRunning()) {
+                debugLog(`${LOG_PREFIX} Auto-starting engine`);
+                void startQueue().then(() => scheduleTick());
+            }
+        }, 1000);
+    }
 }
 
 function cleanupAll() {
@@ -221,7 +277,7 @@ export default definePlugin({
                 .finally(() => scheduleTick());
         },
         QUESTS_ENROLL_SUCCESS() {
-            scheduleTick(500);
+            scheduleEnrollmentWake();
         },
     },
     start() {
@@ -234,7 +290,12 @@ export default definePlugin({
         // discord fills its quest stores lazily, so the resume check runs staged with retries
         setTimeout(() => {
             if (initializeStores()) {
+                // Initialize Traffic queue with Discord's API client
+                initializeTraffic(API);
+                setTrafficEngineRunning(true);
+                
                 setOwner(currentUserId(), { storeMayBeLoaded: true });
+                knownAccountId = currentUserId();
                 setupQuestVideoAutoDismiss();
                 debugLog(`${LOG_PREFIX} Ready!`);
                 void startQueue();
@@ -278,6 +339,10 @@ export default definePlugin({
         debugLog(`${LOG_PREFIX} Plugin stopping...`);
         if (lateResume) clearTimeout(lateResume);
         stopStallWatchdog();
+        setTrafficEngineRunning(false);
+        clearTrafficQueue();
+        taskControlRegistry.cancelAll();
+        taskControlRegistry.clear();
         cleanupAll();
         setOwner(null);
     },
