@@ -232,6 +232,11 @@ export function QuestSettings() {
                     label="Restart when stalled"
                     note="Restart quest automation once when progress stops (off by default)"
                 />
+                <SettingToggle
+                    settingKey="enableAchievementBypass"
+                    label="Achievement bypass"
+                    note="Attempt to complete achievement-in-activity quests via OAuth (requires relay on 127.0.0.1:43210)"
+                />
                 <SettingSelect
                     settingKey="activityHeartbeat"
                     label="Activity heartbeat"
