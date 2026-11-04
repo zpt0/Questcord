@@ -25,6 +25,12 @@ import {
     type TaskType,
 } from "../../core/types";
 
+export const CONSOLE_ONLY_KEYS = new Set(["PLAY_ON_XBOX", "PLAY_ON_PLAYSTATION"]);
+
+export function isConsoleOnly(keys: string[]): boolean {
+    return keys.length > 0 && keys.every(key => CONSOLE_ONLY_KEYS.has(key));
+}
+
 export interface QueueEntry {
     questId: string;
     addedAt: number;
@@ -46,6 +52,8 @@ export const kindOf = (task: TaskType): QueueKind => (isVideoTask(task) ? "video
 export function pickTask(quest: Quest): TaskType | null {
     const cfg = getTaskConfig(quest);
     if (!cfg?.tasks) return null;
+    const keys = Object.keys(cfg.tasks);
+    if (isConsoleOnly(keys)) return null;
     // first type that exists wins; ALL_TASK_TYPES order sets the priority
     return ALL_TASK_TYPES.find((t) => cfg.tasks[t] != null) ?? null;
 }
@@ -66,7 +74,8 @@ export function isExpired(quest: Quest, now = Date.now()): boolean {
 
 export function isQueueable(quest: Quest | undefined, now = Date.now()): boolean {
     if (!quest?.id) return false;
-    return pickTask(quest) != null && !isCompleted(quest) && !isExpired(quest, now);
+    const task = pickTask(quest);
+    return task != null && !isCompleted(quest) && !isExpired(quest, now);
 }
 
 export function describeEntry(
