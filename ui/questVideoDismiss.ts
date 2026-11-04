@@ -111,6 +111,11 @@ function tryDismissQuestVideo() {
             const text = (layer as HTMLElement).textContent ?? "";
             const lower = text.toLowerCase();
 
+            // Skip enrollment/accept quest popups - dismissing these breaks quest enrollment
+            if (lower.includes("accept quest") || lower.includes("enroll") || lower.includes("start quest") || lower.includes("quest enrollment")) {
+                continue;
+            }
+
             const video = layer.querySelector("video");
             if (video) {
                 const src = video.src || video.currentSrc || "";
