@@ -18,6 +18,8 @@
 
 import { Quest } from "../core/types";
 import { completeDesktopQuest, DesktopQuestConfig } from "./desktopBase";
+import { notify } from "../ui/notifications";
+import { LOG_PREFIX } from "../constants";
 
 const STREAM_CONFIG: DesktopQuestConfig = {
     taskName: "STREAM_ON_DESKTOP",
@@ -62,5 +64,11 @@ const STREAM_CONFIG: DesktopQuestConfig = {
 };
 
 export async function completeStreamQuest(quest: Quest, userId: string): Promise<boolean> {
+    notify(
+        "Stream Quest Warning",
+        "Stream quests require a real Go Live session with at least one viewer. Automation may not work.",
+        "info",
+        quest.id
+    );
     return completeDesktopQuest(quest, userId, STREAM_CONFIG);
 }
