@@ -59,6 +59,13 @@ export const settings = definePluginSettings({
         default: false,
         hidden: true,
     },
+    playSessionTail: {
+        type: OptionType.SLIDER,
+        description: "How long to keep the spoofed game running after quest completion (minutes, 0 = disabled)",
+        default: 2,
+        markers: [0, 1, 2, 3, 5, 10],
+        hidden: true,
+    },
     activityHeartbeat: {
         type: OptionType.SELECT,
         description: "How often activity quests report progress (slower is safer on rate limits)",
@@ -86,10 +93,43 @@ export const settings = definePluginSettings({
         default: "videos",
         hidden: true,
     },
+    gameConcurrency: {
+        type: OptionType.SLIDER,
+        description: "Max concurrent game quests (Discord only tracks one at a time)",
+        default: 1,
+        markers: [1, 2],
+        hidden: true,
+    },
+    videoConcurrency: {
+        type: OptionType.SLIDER,
+        description: "Max concurrent video quests",
+        default: 2,
+        markers: [1, 2, 3, 4],
+        hidden: true,
+    },
+    watchForEnrollments: {
+        type: OptionType.BOOLEAN,
+        description: "Auto-start engine when you accept a quest in Discord's Quests page",
+        default: true,
+        hidden: true,
+    },
+    autoStart: {
+        type: OptionType.BOOLEAN,
+        description: "Automatically start the engine on plugin load",
+        default: false,
+        hidden: true,
+    },
 
     debugMode: {
         type: OptionType.BOOLEAN,
         description: "Enable debug logging in the console (useful for troubleshooting)",
+        default: false,
+    },
+
+    enableAchievementBypass: {
+        type: OptionType.BOOLEAN,
+        description:
+            "Enable achievement-in-activity quest bypass via OAuth (requires relay server on 127.0.0.1:43210)",
         default: false,
     },
 
