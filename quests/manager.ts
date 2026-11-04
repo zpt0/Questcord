@@ -41,6 +41,8 @@ import { completeActivityQuest } from "./activity";
 import { completePlayQuest } from "./play";
 import { completeStreamQuest } from "./stream";
 import { completeVideoQuest } from "./video";
+import { taskControlRegistry } from "./taskControl";
+import { emitCompanionEvent, COMPANION_EVENT_CODES } from "../core/events";
 export const SAVED_STATE_KEY = SAVED_QUESTS_KEY;
 
 export const SAVED_STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -106,6 +108,7 @@ export function cancelAll() {
         }
     }
     autoStartedQuests.clear();
+    taskControlRegistry.cancelAll();
 }
 export function cleanupQuest(questId: string, userId: string) {
     const key = getProgressBarKey(questId, userId);
@@ -128,6 +131,11 @@ export function cleanupQuest(questId: string, userId: string) {
         console.warn(`${LOG_PREFIX} Failed to remove saved state:`, e);
     });
     emitSessionEnded(questId);
+    // Release task control if exists
+    const control = taskControlRegistry.get(questId);
+    if (control) {
+        taskControlRegistry.release(questId, control.generation);
+    }
 }
 export function cancelQuest(questId: string, userId: string) {
     const key = getProgressBarKey(questId, userId);
@@ -138,6 +146,8 @@ export function cancelQuest(questId: string, userId: string) {
         notify("Stopped", "Quest automation stopped", "cancel", questId);
         cleanupQuest(questId, userId);
     }
+    // Also pause in task control registry
+    taskControlRegistry.pause(questId);
 }
 function getRunningNonVideoQuestId(): string | null {
     for (const [, data] of activeQuests.entries()) {
@@ -421,9 +431,32 @@ export async function startQuest(
             return "invalid";
         }
         const taskConfig = getTaskConfig(quest);
-        let taskName = taskConfig
-            ? ALL_TASK_TYPES.find((x) => taskConfig?.tasks?.[x] != null)
-            : null;
+        const availableTasks = taskConfig
+            ? ALL_TASK_TYPES.filter((x) => taskConfig?.tasks?.[x] != null)
+            : [];
+
+        // Priority order (matching Orion): ACHIEVEMENT_IN_ACTIVITY > PLAY_ACTIVITY > VIDEO > PLAY_ON_DESKTOP > STREAM
+        // Stream is last because it requires real Go Live + 2nd person in VC (known broken)
+        let taskName: string | null = null;
+        if (availableTasks.length > 0) {
+            if (availableTasks.includes("ACHIEVEMENT_IN_ACTIVITY")) {
+                taskName = "ACHIEVEMENT_IN_ACTIVITY";
+            } else if (availableTasks.includes("PLAY_ACTIVITY")) {
+                taskName = "PLAY_ACTIVITY";
+            } else if (
+                availableTasks.includes("WATCH_VIDEO") ||
+                availableTasks.includes("WATCH_VIDEO_ON_MOBILE") ||
+                availableTasks.includes("WATCH_VIDEO_ON_DESKTOP")
+            ) {
+                taskName = availableTasks.find((t) => t.startsWith("WATCH_VIDEO")) ?? null;
+            } else if (availableTasks.includes("PLAY_ON_DESKTOP")) {
+                taskName = "PLAY_ON_DESKTOP";
+            } else if (availableTasks.includes("STREAM_ON_DESKTOP")) {
+                taskName = "STREAM_ON_DESKTOP";
+            } else {
+                taskName = availableTasks[0];
+            }
+        }
         if (!taskName) {
             try {
                 const questDataResp = await discordApiGet(`/quests/${questId}`);
@@ -431,14 +464,25 @@ export async function startQuest(
                 if (apiQuest) {
                     const apiTaskConfig = getTaskConfig(apiQuest);
                     if (apiTaskConfig) {
-                        taskName = ALL_TASK_TYPES.find((x) => apiTaskConfig?.tasks?.[x] != null);
+                        const apiAvailableTasks = ALL_TASK_TYPES.filter(
+                            (x) => apiTaskConfig?.tasks?.[x] != null
+                        );
+                        if (apiAvailableTasks.includes("ACHIEVEMENT_IN_ACTIVITY")) {
+                            taskName = "ACHIEVEMENT_IN_ACTIVITY";
+                        } else if (apiAvailableTasks.includes("PLAY_ACTIVITY")) {
+                            taskName = "PLAY_ACTIVITY";
+                        } else if (apiAvailableTasks.find((t) => t.startsWith("WATCH_VIDEO"))) {
+                            taskName =
+                                apiAvailableTasks.find((t) => t.startsWith("WATCH_VIDEO")) ?? null;
+                        } else if (apiAvailableTasks.includes("PLAY_ON_DESKTOP")) {
+                            taskName = "PLAY_ON_DESKTOP";
+                        } else if (apiAvailableTasks.includes("STREAM_ON_DESKTOP")) {
+                            taskName = "STREAM_ON_DESKTOP";
+                        } else {
+                            taskName = apiAvailableTasks[0];
+                        }
                         if (taskName) {
                             quest = apiQuest;
-                        } else if (apiTaskConfig?.tasks) {
-                            debugLog(
-                                `${LOG_PREFIX} Unknown task type! Tasks object keys:`,
-                                Object.keys(apiTaskConfig.tasks)
-                            );
                         }
                     }
                 }
@@ -568,14 +612,19 @@ export async function startQuest(
                 }
                 break;
             case "ACHIEVEMENT_IN_ACTIVITY":
-                notify(
-                    "Unsupported Quest",
-                    "This quest requires in-game achievements and cannot be automated.",
-                    "error",
-                    questId
-                );
-                cleanupQuest(questId, userId);
-                return "invalid";
+                if (settings.store.enableAchievementBypass) {
+                    await completeActivityQuest(quest, userId);
+                } else {
+                    notify(
+                        "Unsupported Quest",
+                        "This quest requires in-game achievements. Enable 'Achievement Bypass' in settings to attempt automation.",
+                        "error",
+                        questId
+                    );
+                    cleanupQuest(questId, userId);
+                    return "invalid";
+                }
+                break;
             case "PLAY_ACTIVITY":
                 await completeActivityQuest(quest, userId);
                 break;
