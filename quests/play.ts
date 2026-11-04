@@ -16,8 +16,47 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Quest } from "../core/types";
+import { Quest, resolveApplicationId, resolveApplicationName } from "../core/types";
 import { completeDesktopQuest, DesktopQuestConfig } from "./desktopBase";
+import { discordApiGet } from "../core/api";
+import { pickExecutable } from "../core/utils";
+import { debugLog } from "../core/state";
+import { LOG_PREFIX } from "../constants";
+
+interface GameData {
+    name: string;
+    exeName: string;
+    cmdLine: string;
+    exePath: string;
+    id: string | number;
+}
+
+async function fetchGameData(applicationId: string, applicationName: string): Promise<GameData> {
+    try {
+        const res = await discordApiGet(`/applications/public?application_ids=${applicationId}`);
+        const appData = res?.[0];
+        const cleanName = (appData?.name || applicationName).replace(/[^a-z0-9\s]/gi, "").trim();
+        const { exeName, relPath } = pickExecutable(appData?.executables, cleanName);
+        return {
+            name: appData?.name || applicationName,
+            exeName,
+            cmdLine: `C:\\Program Files\\${relPath.replace(/\//g, "\\")}`,
+            exePath: `c:/program files/${relPath.toLowerCase()}`,
+            id: applicationId,
+        };
+    } catch (e: any) {
+        debugLog(`${LOG_PREFIX} Game metadata fallback for ${applicationName}: ${e?.message ?? e}`);
+        const cleanName = applicationName.replace(/[^a-z0-9\s]/gi, "").trim();
+        const safeExe = `${cleanName.replace(/\s+/g, "")}.exe`;
+        return {
+            name: applicationName,
+            exeName: safeExe,
+            cmdLine: `C:\\Program Files\\${cleanName}\\${safeExe}`,
+            exePath: `c:/program files/${cleanName.toLowerCase()}/${safeExe}`,
+            id: applicationId,
+        };
+    }
+}
 
 const PLAY_CONFIG: DesktopQuestConfig = {
     taskName: "PLAY_ON_DESKTOP",
@@ -25,28 +64,40 @@ const PLAY_CONFIG: DesktopQuestConfig = {
     progressKey: "PLAY_ON_DESKTOP",
     spoofLabel: "Auto-completing:",
     defaultQuestName: "Play Quest",
-    // minified export names change every build; keep this matcher loose
     getStoreModule: (modules) =>
         modules.find((x: any) => x?.exports?.Ay?.getRunningGames)?.exports?.Ay ||
         modules.find((x: any) => x?.exports?.ZP?.getRunningGames)?.exports?.ZP,
-    spoofStore: (store, applicationId, pid) => {
+    spoofStore: (store, applicationId, pid, gameData?: GameData) => {
         const realGetRunningGames = store.getRunningGames;
         const realGetGameForPID = store.getGameForPID;
 
-        const exeName = "app.exe";
-        const fakeGame = {
-            cmdLine: `C:\\Program Files\\App\\${exeName}`,
-            exeName,
-            exePath: `c:/program files/app/${exeName}`,
-            hidden: false,
-            isLauncher: false,
-            id: applicationId,
-            name: "App",
-            pid,
-            pidPath: [pid],
-            processName: "App",
-            start: Date.now(),
-        };
+        const fakeGame = gameData
+            ? {
+                  cmdLine: gameData.cmdLine,
+                  exeName: gameData.exeName,
+                  exePath: gameData.exePath,
+                  hidden: false,
+                  isLauncher: false,
+                  id: applicationId,
+                  name: gameData.name,
+                  pid,
+                  pidPath: [pid],
+                  processName: gameData.exeName.replace(".exe", ""),
+                  start: Date.now(),
+              }
+            : {
+                  cmdLine: `C:\\Program Files\\App\\app.exe`,
+                  exeName: "app.exe",
+                  exePath: `c:/program files/app/app.exe`,
+                  hidden: false,
+                  isLauncher: false,
+                  id: applicationId,
+                  name: "App",
+                  pid,
+                  pidPath: [pid],
+                  processName: "App",
+                  start: Date.now(),
+              };
 
         const fakeGames = [fakeGame];
         store.getRunningGames = () => fakeGames;
@@ -80,5 +131,12 @@ const PLAY_CONFIG: DesktopQuestConfig = {
 };
 
 export async function completePlayQuest(quest: Quest, userId: string): Promise<boolean> {
-    return completeDesktopQuest(quest, userId, PLAY_CONFIG);
+    const applicationId = resolveApplicationId(quest);
+    const applicationName = resolveApplicationName(quest);
+
+    const gameData = applicationId
+        ? await fetchGameData(applicationId, applicationName)
+        : undefined;
+
+    return completeDesktopQuest(quest, userId, PLAY_CONFIG, gameData);
 }
