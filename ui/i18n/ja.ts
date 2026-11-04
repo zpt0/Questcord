@@ -45,4 +45,8 @@ export const messages: Partial<UiMessages> = {
     statusAccepting: "受付中...",
     statusUnavailable: "利用不可",
     queueAria: "クエストキュー",
+    summaryFinished: "完了",
+    summaryBlocked: "ブロック",
+    summaryFiltered: "フィルタ済み (Orbのみ)",
+    summaryFailed: "失敗",
 };

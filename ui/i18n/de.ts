@@ -45,4 +45,8 @@ export const messages: Partial<UiMessages> = {
     statusAccepting: "Wird akzeptiert...",
     statusUnavailable: "Nicht verfügbar",
     queueAria: "Quest-Warteschlange",
+    summaryFinished: "abgeschlossen",
+    summaryBlocked: "blockiert",
+    summaryFiltered: "gefiltert (nur Orbs)",
+    summaryFailed: "fehlgeschlagen",
 };

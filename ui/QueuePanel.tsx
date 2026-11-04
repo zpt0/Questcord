@@ -21,7 +21,7 @@ import { Switch } from "@components/Switch";
 import { React, UserStore } from "@webpack/common";
 
 import { getQuestName } from "../core/types";
-import { cancelQuest, getRunningPercent } from "../quests/manager";
+import { cancelQuest, getRunningPercent, getRunSummary, getSharedGameQuestLines } from "../quests/manager";
 import type { QueueRow } from "../quests/queue/order";
 import { getRows, isQueueEnabled, setQueueEnabled } from "../quests/queue/runner";
 import {
@@ -101,6 +101,35 @@ function EmptyState() {
         <div className="vc-questcord-queue-empty">
             <span className="vc-questcord-queue-empty-title">{t("noQuestsTitle")}</span>
             <span className="vc-questcord-queue-empty-hint">{t("noQuestsHint")}</span>
+        </div>
+    );
+}
+
+function RunSummary() {
+    const summary = getRunSummary();
+    if (summary.finished === 0 && summary.blocked === 0 && summary.filtered === 0 && summary.failed === 0) {
+        return null;
+    }
+    const parts: string[] = [];
+    if (summary.finished) parts.push(`${summary.finished} ${t("summaryFinished")}`);
+    if (summary.blocked) parts.push(`${summary.blocked} ${t("summaryBlocked")}`);
+    if (summary.filtered) parts.push(`${summary.filtered} ${t("summaryFiltered")}`);
+    if (summary.failed) parts.push(`${summary.failed} ${t("summaryFailed")}`);
+    return (
+        <div className="vc-questcord-queue-summary" style={{ marginTop: 12, paddingTop: 8, borderTop: "1px solid var(--border-subtle, rgba(255,255,255,0.08))", fontSize: 12, color: "var(--text-muted, #949ba4)" }}>
+            {parts.join(" · ")}
+        </div>
+    );
+}
+
+function SharedGameLines() {
+    const lines = getSharedGameQuestLines();
+    if (lines.length === 0) return null;
+    return (
+        <div className="vc-questcord-queue-shared" style={{ marginTop: 8, fontSize: 11, color: "var(--text-muted, #949ba4)", lineHeight: 1.4 }}>
+            {lines.map((line, i) => (
+                <div key={i} style={{ marginBottom: 4 }}>{line}</div>
+            ))}
         </div>
     );
 }
@@ -200,6 +229,8 @@ export function QueuePanel({ inline = false }: { inline?: boolean } = {}) {
                     >
                         {t("clearQueue")}
                     </Button>
+                    <RunSummary />
+                    <SharedGameLines />
                 </div>
             )}
         </div>

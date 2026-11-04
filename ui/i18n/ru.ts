@@ -45,4 +45,8 @@ export const messages: Partial<UiMessages> = {
     statusAccepting: "Принятие...",
     statusUnavailable: "Недоступно",
     queueAria: "Очередь квестов",
+    summaryFinished: "завершено",
+    summaryBlocked: "заблокировано",
+    summaryFiltered: "отфильтровано (только Orbs)",
+    summaryFailed: "провалено",
 };

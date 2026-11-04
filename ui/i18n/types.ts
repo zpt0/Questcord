@@ -42,6 +42,10 @@ export type UiMessageKey =
     | "statusWaiting"
     | "statusAccepting"
     | "statusUnavailable"
-    | "queueAria";
+    | "queueAria"
+    | "summaryFinished"
+    | "summaryBlocked"
+    | "summaryFiltered"
+    | "summaryFailed";
 
 export type UiMessages = Record<UiMessageKey, string>;

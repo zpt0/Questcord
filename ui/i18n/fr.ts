@@ -45,4 +45,8 @@ export const messages: Partial<UiMessages> = {
     statusAccepting: "Acceptation...",
     statusUnavailable: "Indisponible",
     queueAria: "File d'attente des quêtes",
+    summaryFinished: "terminées",
+    summaryBlocked: "bloquées",
+    summaryFiltered: "filtrées (orbes uniquement)",
+    summaryFailed: "échouées",
 };

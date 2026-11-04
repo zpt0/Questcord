@@ -45,4 +45,8 @@ export const messages: Partial<UiMessages> = {
     statusAccepting: "Aceptando...",
     statusUnavailable: "No disponible",
     queueAria: "Cola de misiones",
+    summaryFinished: "completadas",
+    summaryBlocked: "bloqueadas",
+    summaryFiltered: "filtradas (solo orbes)",
+    summaryFailed: "fallidas",
 };

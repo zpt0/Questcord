@@ -45,4 +45,8 @@ export const messages: Partial<UiMessages> = {
     statusAccepting: "수락 중...",
     statusUnavailable: "사용 불가",
     queueAria: "Quest 대기열",
+    summaryFinished: "완료",
+    summaryBlocked: "차단됨",
+    summaryFiltered: "필터됨 (Orb만)",
+    summaryFailed: "실패",
 };

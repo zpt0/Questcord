@@ -45,4 +45,8 @@ export const messages: Partial<UiMessages> = {
     statusAccepting: "接受中...",
     statusUnavailable: "不可用",
     queueAria: "任务队列",
+    summaryFinished: "已完成",
+    summaryBlocked: "已阻止",
+    summaryFiltered: "已过滤 (仅Orbs)",
+    summaryFailed: "失败",
 };

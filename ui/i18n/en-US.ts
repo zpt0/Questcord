@@ -45,4 +45,8 @@ export const messages: UiMessages = {
     statusAccepting: "Accepting...",
     statusUnavailable: "Unavailable",
     queueAria: "Quest queue",
+    summaryFinished: "finished",
+    summaryBlocked: "blocked",
+    summaryFiltered: "filtered (Orb-only)",
+    summaryFailed: "failed",
 };
