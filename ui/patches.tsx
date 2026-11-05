@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 /* eslint-disable no-useless-escape -- the \i placeholder in Discord's minified matchers is intentional */
 
@@ -22,10 +22,10 @@ import type { Quest } from "../core/types";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { QuestButton } from "./QuestButton";
 import { QueueButton } from "./QueueButton";
-import { isQueueable } from "../quests/queue/order";
+import { isQueueable, getUnsupportedQuestReason } from "../quests/queue/order";
 
 export const questPatches = [
-    // wrap discord's tile footer renderer instead of replacing it, discord's own layout has to stay
+    // wrap Discord's tile footer renderer instead of replacing it; Discord's layout must stay
     {
         find: ".QUEST_HOME_TILE_FOOTER,analyticsCtxQuestContent",
         replacement: {
@@ -67,7 +67,7 @@ export function renderFooter(props: { quest?: Quest }, Footer: React.ComponentTy
     return (
         <div className="vc-questcord-footer" style={{ width: "100%" }}>
             <Footer {...props} />
-            {isQueueable(props?.quest) && (
+            {(isQueueable(props?.quest) || getUnsupportedQuestReason(props?.quest) != null) && (
                 <div
                     className="vc-questcord-footer-row"
                     style={{

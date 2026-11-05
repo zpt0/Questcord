@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { Button, type ButtonVariant } from "@components/Button";
 import { React, UserStore } from "@webpack/common";
@@ -22,7 +22,7 @@ import { React, UserStore } from "@webpack/common";
 import { settings } from "../settings";
 import { type Quest } from "../core/types";
 import { cancelQuest, isAnyRunning, isRunning, startQuest } from "../quests/manager";
-import { isEnrolled, isQueueable } from "../quests/queue/order";
+import { isEnrolled, isQueueable, getUnsupportedQuestReason } from "../quests/queue/order";
 import { toggleQueued } from "../quests/queue/runner";
 import { getEntries, getVersion, isQueued, subscribe } from "../quests/queue/store";
 import { t } from "./i18n";
@@ -42,6 +42,33 @@ export function QuestButton({ quest }: { quest: Quest }) {
     void queueVersion;
     void preference;
 
+    const unsupportedReason = getUnsupportedQuestReason(quest);
+    const unsupported =
+        unsupportedReason != null &&
+        !(
+            unsupportedReason === "achievement-in-activity" &&
+            settings.store.enableAchievementBypass
+        );
+
+    if (unsupported) {
+        return (
+            <Button
+                className="vc-questcord-tile-btn vc-questcord-unsupported-btn"
+                style={{ width: "100%", minWidth: 0 }}
+                variant="secondary"
+                size="medium"
+                disabled
+                title={t(
+                    unsupportedReason === "achievement-in-game"
+                        ? "unsupportedAchievementInGame"
+                        : "unsupportedAchievementBypassOff"
+                )}
+            >
+                {t("unsupported")}
+            </Button>
+        );
+    }
+
     if (!isQueueable(quest)) return null;
 
     const questId = quest.id;
@@ -50,8 +77,7 @@ export function QuestButton({ quest }: { quest: Quest }) {
     const enrolled = isEnrolled(quest);
     const busy = isAnyRunning() || getEntries().length > 0;
 
-    // one button per tile, the action depends on the state: not accepted quests are still
-    // queueable, the queue accepts them itself once it runs
+    // One button per tile; unaccepted quests are still queueable, the queue accepts them on run.
     let variant: ButtonVariant = "primary";
     let label = t("autoComplete");
     let title: string | undefined;

@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 export type UiMessageKey =
     | "autoComplete"
@@ -46,6 +46,9 @@ export type UiMessageKey =
     | "summaryFinished"
     | "summaryBlocked"
     | "summaryFiltered"
-    | "summaryFailed";
+    | "summaryFailed"
+    | "unsupported"
+    | "unsupportedAchievementInGame"
+    | "unsupportedAchievementBypassOff";
 
 export type UiMessages = Record<UiMessageKey, string>;

@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { LOG_PREFIX } from "../constants";
 import { debugLog, isPluginStopping } from "../core/state";
@@ -111,8 +111,13 @@ function tryDismissQuestVideo() {
             const text = (layer as HTMLElement).textContent ?? "";
             const lower = text.toLowerCase();
 
-            // Skip enrollment/accept quest popups - dismissing these breaks quest enrollment
-            if (lower.includes("accept quest") || lower.includes("enroll") || lower.includes("start quest") || lower.includes("quest enrollment")) {
+            // Skip enrollment/accept popups: dismissing them breaks quest enrollment
+            if (
+                lower.includes("accept quest") ||
+                lower.includes("enroll") ||
+                lower.includes("start quest") ||
+                lower.includes("quest enrollment")
+            ) {
                 continue;
             }
 

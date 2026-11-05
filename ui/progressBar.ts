@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,55 +14,11 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { settings } from "../settings";
 import { activeQuests, getProgressBarKey, isPluginStopping, progressBars } from "../core/state";
-import { questTileSelector } from "../core/utils";
 import { updateQuestPill } from "./notifications";
-
-export function getDiscordProgressPercent(questId: string): number | null {
-    try {
-        // discord exposes no progress api here, scrape the ring svg it renders
-        const questTile = document.querySelector(questTileSelector(questId));
-        if (!questTile) return null;
-        const allCircles = questTile.querySelectorAll("circle");
-        let greenCircle: Element | null = null;
-        allCircles.forEach((circle) => {
-            const stroke = circle.getAttribute("stroke");
-            const style = circle.getAttribute("style");
-            if (stroke && (stroke.includes("green") || stroke.includes("--green-330"))) {
-                greenCircle = circle;
-            } else if (style && style.includes("green")) {
-                greenCircle = circle;
-            }
-        });
-        if (!greenCircle && allCircles.length >= 2) {
-            // fallback when no green stroke is found: the ring is usually the 2nd circle
-            greenCircle = allCircles[1];
-        }
-        if (!greenCircle) return null;
-        let dashArray = greenCircle.getAttribute("stroke-dasharray");
-        let dashOffset = greenCircle.getAttribute("stroke-dashoffset");
-        if (!dashArray || !dashOffset) {
-            const style = window.getComputedStyle(greenCircle);
-            dashArray = dashArray || style.strokeDasharray;
-            dashOffset = dashOffset || style.strokeDashoffset;
-        }
-        if (!dashArray || !dashOffset || dashArray === "none" || dashOffset === "none") return null;
-        const circumferenceMatch = dashArray.match(/[\d.]+/);
-        if (!circumferenceMatch) return null;
-        const circumference = parseFloat(circumferenceMatch[0]);
-        const offset = parseFloat(dashOffset);
-        if (isNaN(circumference) || isNaN(offset)) return null;
-        const progressLength = circumference - Math.abs(offset);
-        const rawPercent = (progressLength / circumference) * 100;
-        const percent = Math.max(0, Math.min(100, rawPercent));
-        return percent >= 99.9 ? 100 : Math.min(99, Math.floor(percent));
-    } catch {
-        return null;
-    }
-}
 
 export function createProgressBar(questId: string, userId: string): HTMLElement {
     const key = getProgressBarKey(questId, userId);
@@ -88,7 +44,29 @@ export function updateProgressBar(questId: string, userId: string, percent: numb
         questData.lastProgress = clampedPercent;
     }
     if (!settings.store.showProgressBar) return;
-    updateQuestPill(questId, undefined, clampedPercent);
+
+    // Mirror Discord's optimistic progress so pill and bar show the same percentage.
+    const now = Date.now();
+    if (
+        questData &&
+        questData.isProcessing &&
+        (!questData.lastProgressUpdate || now - questData.lastProgressUpdate >= 300)
+    ) {
+        const questName =
+            questData.taskType === "WATCH_VIDEO"
+                ? "Video Quest"
+                : questData.taskType === "PLAY_ON_DESKTOP"
+                  ? "Play Quest"
+                  : questData.taskType === "STREAM_ON_DESKTOP"
+                    ? "Stream Quest"
+                    : questData.taskType === "ACHIEVEMENT_IN_ACTIVITY"
+                      ? "Activity Quest"
+                      : "Quest";
+
+        // Update pill with our calculated quest progress for accuracy
+        updateQuestPill(questId, `Completing: ${questName}`, clampedPercent);
+        questData.lastProgressUpdate = now;
+    }
 }
 
 export function removeProgressBar(questId: string, userId: string) {

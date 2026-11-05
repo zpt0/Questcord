@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import type { UiMessages } from "./types";
 
@@ -49,4 +49,7 @@ export const messages: Partial<UiMessages> = {
     summaryBlocked: "已阻止",
     summaryFiltered: "已过滤 (仅Orbs)",
     summaryFailed: "失败",
+    unsupported: "不支持",
+    unsupportedAchievementInGame: "此任务需要在游戏内完成成就，Questcord 无法代劳。",
+    unsupportedAchievementBypassOff: "请在设置中启用“成就绕过”以尝试此任务。",
 };

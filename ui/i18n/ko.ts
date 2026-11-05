@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import type { UiMessages } from "./types";
 
@@ -49,4 +49,9 @@ export const messages: Partial<UiMessages> = {
     summaryBlocked: "차단됨",
     summaryFiltered: "필터됨 (Orb만)",
     summaryFailed: "실패",
+    unsupported: "지원되지 않음",
+    unsupportedAchievementInGame:
+        "이 퀘스트는 게임 내에서 업적을 달성해야 하며 Questcord에서는 수행할 수 없습니다.",
+    unsupportedAchievementBypassOff:
+        "설정에서 '업적 우회'를 활성화하면 이 퀘스트를 시도할 수 있습니다.",
 };
