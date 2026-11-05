@@ -26,7 +26,7 @@
 > [!CAUTION]
 > Discord has been enforcing against quest automation. People have received quest access restrictions and account standing violations after running automation — any automation, not only this. That is the trade you are making.
 >
-> The **achievement bypass** is the riskiest part: it runs a real OAuth2 authorization against the quest's application on your account and posts forged progress to `discordsays.com`. It is off by default and stays behind a setting you must turn on yourself. If you would mind losing the account, do not run this on it.
+> The **achievement bypass** is the riskiest part: it opens a real Discord OAuth2 consent popup for the quest's application on your account, mints a proxy ticket, and posts forged progress either to a local relay on `127.0.0.1:43210` (tried first) or, as a fallback, to `https://<app>.discordsays.com/api/v1/achievements/progress`, then revokes the grant. It is **off by default** and stays behind a setting you must turn on yourself. If you would mind losing the account, do not run this on it.
 >
 > A telemetry blocker does not hide this: quest progress travels on the quest heartbeat, not on analytics.
 >
@@ -106,15 +106,19 @@
   </tr>
   <tr>
     <td align="left"><code>PLAY_ACTIVITY</code></td>
-    <td align="left">Heartbeats against a voice channel stream key.</td>
+    <td align="left">Heartbeats against a voice channel stream key. Subject to a <strong>25-minute hard cap per task</strong>.</td>
   </tr>
   <tr>
     <td align="left"><code>ACHIEVEMENT_IN_ACTIVITY</code></td>
-    <td align="left">Tries the heartbeat first. Discord rejects those with a 403 because the activity backend validates them rather than the client, so it falls back to the OAuth path: authorize the quest's app on your account, mint a proxy ticket, post forged progress to <code>discordsays.com</code>, then revoke the grant. Off by default.</td>
+    <td align="left">Tries the heartbeat first. Discord rejects those with a 403 because the activity backend validates them rather than the client, so it falls back to the OAuth path: authorize the quest's app on your account, mint a proxy ticket, post forged progress via the local relay on <code>127.0.0.1:43210</code> (tried first) or <code>discordsays.com</code> (fallback), then revoke the grant. <strong>Off by default.</strong></td>
   </tr>
   <tr>
     <td align="left"><code>ACHIEVEMENT_IN_GAME</code></td>
     <td align="left"><strong>Not possible.</strong> The achievement is earned in the retail game with the game linked to your account — nothing in Discord can stand in for that. Named in the log and skipped.</td>
+  </tr>
+  <tr>
+    <td align="left"><code>PLAY_ON_XBOX</code>, <code>PLAY_ON_PLAYSTATION</code></td>
+    <td align="left"><strong>Not automated.</strong> Console-only quest types are detected and filtered out by the queue; they cannot be completed through Discord's desktop client.</td>
   </tr>
 </table>
 
@@ -127,6 +131,9 @@
 ```bash
 cd path/to/Vencord/src/userplugins
 git clone https://github.com/zpt0/Questcord.git
+cd Questcord
+npm ci
+npm run typecheck   # optional but recommended
 ```
 
 </td></tr></table>
@@ -143,7 +150,7 @@ git clone https://github.com/zpt0/Questcord.git
 
 <h3 align="center">Queue</h3>
 
-<p align="center">Quests can be added to a queue from Discord's quest tiles. The queue runs them automatically, one at a time per type (video and game quests can run in parallel up to your configured concurrency). Open the queue popout from any quest tile to see running, waiting, and completed quests.</p>
+<p align="center">Quests can be added to a queue from Discord's quest tiles. The queue runs them automatically with a lane-based scheduler: game quests (limit=1) and video quests (limit=2) run in round-robin order with configurable concurrency. Console-only quests (XBOX / PLAYSTATION) are detected and excluded. Open the queue popout from any quest tile to see running, waiting, and completed quests.</p>
 
 <h3 align="center">Settings</h3>
 
@@ -153,30 +160,82 @@ git clone https://github.com/zpt0/Questcord.git
   <tr>
     <th align="left">Setting</th>
     <th align="left">What it does</th>
+    <th align="left">Default</th>
   </tr>
   <tr>
     <td align="left">Auto-start</td>
     <td align="left">Automatically start the engine on plugin load.</td>
+    <td align="left">Off</td>
   </tr>
   <tr>
     <td align="left">Orb quests only</td>
     <td align="left">Only run quests that reward Orbs; skips quests with other reward types.</td>
+    <td align="left">Off</td>
   </tr>
   <tr>
     <td align="left">Achievement bypass</td>
-    <td align="left">Enable achievement-in-activity quest bypass via OAuth (requires relay server on <code>127.0.0.1:43210</code>). Off by default.</td>
+    <td align="left">Enable achievement-in-activity quest bypass via OAuth + local relay (<code>127.0.0.1:43210</code>, fallback <code>discordsays.com</code>). Off by default.</td>
+    <td align="left">Off</td>
   </tr>
   <tr>
     <td align="left">Activity heartbeat</td>
-    <td align="left">How often activity quests report progress — slower is safer on rate limits.</td>
+    <td align="left">How often activity quests report progress (Fast / Balanced / Official pace — slower is safer on rate limits).</td>
+    <td align="left">Fast</td>
   </tr>
   <tr>
     <td align="left">Play session tail</td>
-    <td align="left">How long to keep the spoofed game running after quest completion.</td>
+    <td align="left">How long to keep the spoofed game running after quest completion (minutes, 0 = disabled).</td>
+    <td align="left">2 min</td>
   </tr>
   <tr>
-    <td align="left">Pill position / colors</td>
-    <td align="left">Customize where and how progress pills look on screen.</td>
+    <td align="left">Queue enabled</td>
+    <td align="left">Run queued quests automatically via the queue popout.</td>
+    <td align="left">On</td>
+  </tr>
+  <tr>
+    <td align="left">Queue preference</td>
+    <td align="left">Which kind of quest the queue runs first (Videos first / Games first).</td>
+    <td align="left">Videos</td>
+  </tr>
+  <tr>
+    <td align="left">Game concurrency</td>
+    <td align="left">Max concurrent game quests (Discord only tracks one at a time).</td>
+    <td align="left">1</td>
+  </tr>
+  <tr>
+    <td align="left">Video concurrency</td>
+    <td align="left">Max concurrent video quests.</td>
+    <td align="left">2</td>
+  </tr>
+  <tr>
+    <td align="left">Watch for enrollments</td>
+    <td align="left">Auto-start the engine when you accept a quest in Discord's Quests page.</td>
+    <td align="left">On</td>
+  </tr>
+  <tr>
+    <td align="left">Auto dismiss popups</td>
+    <td align="left">Automatically dismiss quest video and mobile QR code popups.</td>
+    <td align="left">On</td>
+  </tr>
+  <tr>
+    <td align="left">Auto restart stalled</td>
+    <td align="left">Automatically restart quest automation once when progress stalls.</td>
+    <td align="left">Off</td>
+  </tr>
+  <tr>
+    <td align="left">Debug mode</td>
+    <td align="left">Enable debug logging in the console (useful for troubleshooting).</td>
+    <td align="left">Off</td>
+  </tr>
+  <tr>
+    <td align="left">Show update notifications</td>
+    <td align="left">Show notifications when a new version is available.</td>
+    <td align="left">On</td>
+  </tr>
+  <tr>
+    <td align="left">Pill position / colors / appearance</td>
+    <td align="left">Customize where and how progress pills look on screen (position, background, accent, text, percent, bar, border colors, radius, font size, opacity, padding).</td>
+    <td align="left">See settings</td>
   </tr>
 </table>
 
@@ -186,7 +245,9 @@ git clone https://github.com/zpt0/Questcord.git
 
 <p align="center">Questcord reads Discord's own webpack stores (quests, running games, channel stores) and drives Discord's own authenticated API client. Stores are found by class name and shape, not by minified paths, so the plugin survives Discord renaming things between builds.</p>
 
-<p align="center">Quest progress is shown on pill overlays in real time. A queue scheduler alternates video and game quests round-robin, with per-type concurrency limits. Stall detection restarts automation when progress stops, and a watchdog gives up on quests Discord stops accepting.</p>
+<p align="center">Quest progress is shown on pill overlays in real time. A lane-based scheduler alternates video and game quests round-robin, with per-type concurrency limits. A centralized Traffic queue rate-limits Discord API calls (exponential backoff + jitter, per-request <code>AbortSignal</code>). A generation-based TaskControlRegistry manages task lifecycle with clean cancellation and pause/resume. Stall detection restarts automation when progress stops, and a watchdog gives up on quests Discord stops accepting (activity quests have a 25-minute hard cap).</p>
+
+<p align="center">The UI is fully translated into <strong>10 locales</strong> (English, German, French, Spanish, Italian, Portuguese, Russian, Japanese, Korean, Chinese) with automatic fallback to English.</p>
 
 ---
 
