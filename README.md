@@ -24,7 +24,9 @@
 ---
 
 > [!CAUTION]
-> Discord has been enforcing against quest automation. People have received quest access restrictions and account standing violations after running automation — any automation, not only this. That is the trade you are making.
+> Discord has been stepping up enforcement against quest automation. Users have received quest access restrictions and account standing violations after running automation — any automation, not only Questcord. A ban or quest restriction is possible.
+>
+> That said, we have built Questcord to run quietly and carefully, and we consider the risk manageable when used normally. Everything we can do on our side to keep it safe is done — use it as intended and don't deliberately abuse it.
 >
 > The **achievement bypass** is the riskiest part: it opens a real Discord OAuth2 consent popup for the quest's application on your account, mints a proxy ticket, and posts forged progress either to a local relay on `127.0.0.1:43210` (tried first) or, as a fallback, to `https://<app>.discordsays.com/api/v1/achievements/progress`, then revokes the grant. It is **off by default** and stays behind a setting you must turn on yourself. If you would mind losing the account, do not run this on it.
 >
