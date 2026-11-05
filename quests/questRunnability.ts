@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,9 +14,16 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
-import { Quest, getTaskConfig, getQuestName, TaskType, resolveApplicationId, resolveApplicationName } from "../core/types";
+import {
+    Quest,
+    getTaskConfig,
+    getQuestName,
+    TaskType,
+    resolveApplicationId,
+    resolveApplicationName,
+} from "../core/types";
 import { isConsoleOnly, CONSOLE_ONLY_KEYS } from "./queue/order";
 import { pickExecutable } from "../core/utils";
 import { settings } from "../settings";
@@ -54,7 +61,10 @@ export interface DetectedTask {
 }
 
 export const UNAUTOMATABLE_KEYS = new Map<string, string>([
-    ["ACHIEVEMENT_IN_GAME", "That needs the game linked to your account and an achievement earned inside the game itself, which nothing running in Discord can do for you."],
+    [
+        "ACHIEVEMENT_IN_GAME",
+        "That needs the game linked to your account and an achievement earned inside the game itself, which nothing running in Discord can do for you.",
+    ],
 ]);
 
 export interface TaskFamilyRule {
@@ -64,23 +74,30 @@ export interface TaskFamilyRule {
 }
 
 /**
- * Task family order (ACHIEVEMENT_IN_ACTIVITY > PLAY_ACTIVITY > VIDEO > PLAY_ON_DESKTOP > STREAM):
- * ACHIEVEMENT_IN_ACTIVITY > PLAY_ACTIVITY > VIDEO > PLAY_ON_DESKTOP > STREAM
+ * Task family priority: ACHIEVEMENT_IN_ACTIVITY > PLAY_ACTIVITY > VIDEO > PLAY_ON_DESKTOP > STREAM.
  */
 export const TASK_FAMILY_ORDER: TaskFamilyRule[] = [
-    { match: key => key === "ACHIEVEMENT_IN_ACTIVITY", type: "ACHIEVEMENT_IN_ACTIVITY" },
-    { match: key => key === "PLAY_ACTIVITY", type: "PLAY_ACTIVITY" },
-    { match: key => key.includes("VIDEO"), type: "WATCH_VIDEO", prefer: ["WATCH_VIDEO"] },
-    { match: key => key.startsWith("PLAY"), type: "PLAY_ON_DESKTOP", prefer: ["PLAY_ON_DESKTOP"] },
-    { match: key => key.startsWith("STREAM"), type: "STREAM_ON_DESKTOP", prefer: ["STREAM_ON_DESKTOP"] },
-    { match: key => key.includes("ACTIVITY"), type: "PLAY_ACTIVITY" },
+    { match: (key) => key === "ACHIEVEMENT_IN_ACTIVITY", type: "ACHIEVEMENT_IN_ACTIVITY" },
+    { match: (key) => key === "PLAY_ACTIVITY", type: "PLAY_ACTIVITY" },
+    { match: (key) => key.includes("VIDEO"), type: "WATCH_VIDEO", prefer: ["WATCH_VIDEO"] },
+    {
+        match: (key) => key.startsWith("PLAY"),
+        type: "PLAY_ON_DESKTOP",
+        prefer: ["PLAY_ON_DESKTOP"],
+    },
+    {
+        match: (key) => key.startsWith("STREAM"),
+        type: "STREAM_ON_DESKTOP",
+        prefer: ["STREAM_ON_DESKTOP"],
+    },
+    { match: (key) => key.includes("ACTIVITY"), type: "PLAY_ACTIVITY" },
 ];
 
 export function selectTaskFamily(keys: string[]): { type: TaskType; keyName: string } | undefined {
     for (const rule of TASK_FAMILY_ORDER) {
-        const exact = rule.prefer ? keys.find(key => rule.prefer!.includes(key)) : undefined;
+        const exact = rule.prefer ? keys.find((key) => rule.prefer!.includes(key)) : undefined;
         if (exact) return { type: rule.type, keyName: exact };
-        const match = keys.find(key => rule.match(key) && !CONSOLE_ONLY_KEYS.has(key));
+        const match = keys.find((key) => rule.match(key) && !CONSOLE_ONLY_KEYS.has(key));
         if (match) return { type: rule.type, keyName: match };
     }
     return undefined;
@@ -133,13 +150,16 @@ export function assessQuestRunnability(quest: Quest, isDesktop: boolean): QuestR
 }
 
 export function questBlocker(q: QuestRunnability): string | null {
-    if (!q.hasTaskConfig) return `"${q.name}" has no usable task config, so there is nothing to drive.`;
+    if (!q.hasTaskConfig)
+        return `"${q.name}" has no usable task config, so there is nothing to drive.`;
 
     if (!q.detected) {
-        if (!q.keys.length) return `"${q.name}" lists no tasks at all, so there is nothing to drive.`;
-        if (isConsoleOnly(q.keys)) return `"${q.name}" is console-only (${q.keys.join(", ")}), so no desktop client can run it.`;
+        if (!q.keys.length)
+            return `"${q.name}" lists no tasks at all, so there is nothing to drive.`;
+        if (isConsoleOnly(q.keys))
+            return `"${q.name}" is console-only (${q.keys.join(", ")}), so no desktop client can run it.`;
 
-        const named = q.keys.find(key => UNAUTOMATABLE_KEYS.has(key));
+        const named = q.keys.find((key) => UNAUTOMATABLE_KEYS.has(key));
         if (named) {
             return q.keys.length === 1
                 ? `"${q.name}" offers only ${named}. ${UNAUTOMATABLE_KEYS.get(named)}`
@@ -164,7 +184,11 @@ export function questBlocker(q: QuestRunnability): string | null {
 
 export type QuestOutcome = "completed" | "blocked" | "failed" | "filtered";
 
-export function recordOutcome(outcomes: Map<string, QuestOutcome>, id: string, outcome: QuestOutcome): void {
+export function recordOutcome(
+    outcomes: Map<string, QuestOutcome>,
+    id: string,
+    outcome: QuestOutcome
+): void {
     if (outcomes.get(id) === "completed") return;
     outcomes.set(id, outcome);
 }
@@ -179,7 +203,10 @@ export interface RunSummary {
 }
 
 export function summarizeRun(outcomes: Map<string, QuestOutcome>): RunSummary {
-    let finished = 0, blocked = 0, filtered = 0, failed = 0;
+    let finished = 0,
+        blocked = 0,
+        filtered = 0,
+        failed = 0;
     for (const outcome of outcomes.values()) {
         if (outcome === "completed") finished++;
         else if (outcome === "blocked") blocked++;
@@ -188,7 +215,14 @@ export function summarizeRun(outcomes: Map<string, QuestOutcome>): RunSummary {
     }
 
     if (!blocked && !filtered && !failed) {
-        return { finished, blocked, filtered, failed, line: "All available quests are completed!", playDone: true };
+        return {
+            finished,
+            blocked,
+            filtered,
+            failed,
+            line: "All available quests are completed!",
+            playDone: true,
+        };
     }
 
     const parts: string[] = [];
@@ -196,13 +230,20 @@ export function summarizeRun(outcomes: Map<string, QuestOutcome>): RunSummary {
     if (blocked) parts.push(`${blocked} skipped because this client cannot drive them`);
     if (filtered) parts.push(`${filtered} left out because they pay no Orbs`);
     if (failed) parts.push(`${failed} failed`);
-    return { finished, blocked, filtered, failed, line: `Nothing left to run. ${parts.join(", ")}.`, playDone: finished > 0 };
+    return {
+        finished,
+        blocked,
+        filtered,
+        failed,
+        line: `Nothing left to run. ${parts.join(", ")}.`,
+        playDone: finished > 0,
+    };
 }
 
 export function summarizeSharedGameQuests(
-    tasks: ReadonlyArray<{ appId: string | number; name: string; type: string; }>,
+    tasks: ReadonlyArray<{ appId: string | number; name: string; type: string }>
 ): string[] {
-    const groups = new Map<string, { name: string; count: number; }>();
+    const groups = new Map<string, { name: string; count: number }>();
     for (const t of tasks) {
         if (t.type !== "PLAY_ON_DESKTOP") continue;
         const key = String(t.appId ?? "");
@@ -215,14 +256,20 @@ export function summarizeSharedGameQuests(
     const lines: string[] = [];
     for (const { name, count } of groups.values()) {
         if (count < 2) continue;
-        lines.push(`${count} "${name}" quests are the same game, so Discord credits all ${count} while it runs once and they finish together. The limit still drives one at a time.`);
+        lines.push(
+            `${count} "${name}" quests are the same game, so Discord credits all ${count} while it runs once and they finish together. The limit still drives one at a time.`
+        );
     }
     return lines;
 }
 
 export function isQuestExpired(questStore: any, q: Quest): boolean {
     if (typeof questStore?.isQuestExpired === "function") {
-        try { return questStore.isQuestExpired(q.id) === true; } catch { /* fall through to the timestamp */ }
+        try {
+            return questStore.isQuestExpired(q.id) === true;
+        } catch {
+            /* fall through to the timestamp */
+        }
     }
     const ends = new Date(q.config?.expiresAt ?? NaN).getTime();
     return !isNaN(ends) && ends <= Date.now();

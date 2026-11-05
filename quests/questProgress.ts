@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,19 +14,16 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { settings } from "../settings";
-import { createProgressBar, getDiscordProgressPercent, updateProgressBar } from "../ui/progressBar";
+import { createProgressBar, updateProgressBar } from "../ui/progressBar";
 
 export function initializeQuestProgressBar(questId: string, userId: string): void {
     if (!settings.store.showProgressBar) return;
     createProgressBar(questId, userId);
     // wait for discord to render the tile before reading its current progress
     setTimeout(() => {
-        const initialPercent = getDiscordProgressPercent(questId);
-        if (initialPercent !== null) {
-            updateProgressBar(questId, userId, initialPercent);
-        }
+        updateProgressBar(questId, userId, 0);
     }, 100);
 }

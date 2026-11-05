@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,14 +14,10 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { Quest, resolveApplicationId, resolveApplicationName } from "../core/types";
 import { completeDesktopQuest, DesktopQuestConfig } from "./desktopBase";
-import { discordApiGet } from "../core/api";
-import { pickExecutable } from "../core/utils";
-import { debugLog } from "../core/state";
-import { LOG_PREFIX } from "../constants";
 
 interface GameData {
     name: string;
@@ -32,30 +28,15 @@ interface GameData {
 }
 
 async function fetchGameData(applicationId: string, applicationName: string): Promise<GameData> {
-    try {
-        const res = await discordApiGet(`/applications/public?application_ids=${applicationId}`);
-        const appData = res?.[0];
-        const cleanName = (appData?.name || applicationName).replace(/[^a-z0-9\s]/gi, "").trim();
-        const { exeName, relPath } = pickExecutable(appData?.executables, cleanName);
-        return {
-            name: appData?.name || applicationName,
-            exeName,
-            cmdLine: `C:\\Program Files\\${relPath.replace(/\//g, "\\")}`,
-            exePath: `c:/program files/${relPath.toLowerCase()}`,
-            id: applicationId,
-        };
-    } catch (e: any) {
-        debugLog(`${LOG_PREFIX} Game metadata fallback for ${applicationName}: ${e?.message ?? e}`);
-        const cleanName = applicationName.replace(/[^a-z0-9\s]/gi, "").trim();
-        const safeExe = `${cleanName.replace(/\s+/g, "")}.exe`;
-        return {
-            name: applicationName,
-            exeName: safeExe,
-            cmdLine: `C:\\Program Files\\${cleanName}\\${safeExe}`,
-            exePath: `c:/program files/${cleanName.toLowerCase()}/${safeExe}`,
-            id: applicationId,
-        };
-    }
+    const cleanName = (applicationName || "App").replace(/[^a-z0-9\s]/gi, "").trim() || "App";
+    const safeExe = `${cleanName.replace(/\s+/g, "")}.exe`;
+    return {
+        name: applicationName || "App",
+        exeName: safeExe,
+        cmdLine: `C:\\Program Files\\${cleanName}\\${safeExe}`,
+        exePath: `c:/program files/${cleanName.toLowerCase()}/${safeExe}`,
+        id: applicationId,
+    };
 }
 
 const PLAY_CONFIG: DesktopQuestConfig = {
@@ -64,9 +45,22 @@ const PLAY_CONFIG: DesktopQuestConfig = {
     progressKey: "PLAY_ON_DESKTOP",
     spoofLabel: "Auto-completing:",
     defaultQuestName: "Play Quest",
-    getStoreModule: (modules) =>
-        modules.find((x: any) => x?.exports?.Ay?.getRunningGames)?.exports?.Ay ||
-        modules.find((x: any) => x?.exports?.ZP?.getRunningGames)?.exports?.ZP,
+    getStoreModule: (modules) => {
+        for (const m of modules) {
+            const exps = m?.exports;
+            if (!exps) continue;
+            if (exps.Ay?.getRunningGames) return exps.Ay;
+            if (exps.ZP?.getRunningGames) return exps.ZP;
+            if (exps.getRunningGames) return exps;
+            for (const key of Object.keys(exps)) {
+                const val = exps[key];
+                if (val && typeof val === "object" && typeof val.getRunningGames === "function") {
+                    return val;
+                }
+            }
+        }
+        return null;
+    },
     spoofStore: (store, applicationId, pid, gameData?: GameData) => {
         const realGetRunningGames = store.getRunningGames;
         const realGetGameForPID = store.getGameForPID;

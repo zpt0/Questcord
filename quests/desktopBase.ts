@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { LOG_PREFIX } from "../constants";
 import {
@@ -58,6 +58,47 @@ const DESKTOP_MAX_RUNTIME_BUFFER_MS = 15 * 60 * 1000;
 const DESKTOP_HARD_CAP_MS = 25 * 60 * 1000;
 const HEARTBEAT_TIMEOUT_MS = 90 * 1000;
 const MAX_CONSECUTIVE_FAILURES = 5;
+// Discord clamps live optimistic progress just below the target until the server confirms completion.
+const DISCORD_PROGRESS_CAP = 0.99;
+
+/**
+ * Mirrors Discord's optimistic progress: last reported value plus elapsed
+ * heartbeat time, capped at 99% of target, so the pill stays in lockstep.
+ */
+function getOptimisticProgressSeconds(
+    quest: Quest | null | undefined,
+    taskKey: string,
+    fallbackProgress: number,
+    targetSeconds: number
+): number {
+    if (quest?.userStatus?.completedAt != null) return targetSeconds;
+
+    const taskProgress = quest?.userStatus?.progress?.[taskKey];
+    const reported =
+        taskProgress?.value ?? quest?.userStatus?.streamProgressSeconds ?? fallbackProgress;
+    let progress = typeof reported === "number" ? reported : fallbackProgress;
+
+    const lastBeatAt = taskProgress?.heartbeat?.lastBeatAt;
+    if (lastBeatAt != null) {
+        const beatMs = new Date(lastBeatAt).valueOf();
+        const elapsedSeconds = (Date.now() - beatMs) / 1000;
+        if (Number.isFinite(elapsedSeconds) && elapsedSeconds > 0) {
+            progress += elapsedSeconds;
+        }
+    }
+
+    return Math.max(0, Math.min(progress, targetSeconds * DISCORD_PROGRESS_CAP));
+}
+
+function getOptimisticPercent(
+    optimisticProgress: number,
+    reportedProgress: number,
+    targetSeconds: number
+): number {
+    if (reportedProgress >= targetSeconds) return 100;
+    // epsilon guards against 0.99 * target rounding down to 98.999…%
+    return Math.min(99, Math.floor((optimisticProgress / targetSeconds) * 100 + 1e-6));
+}
 
 interface WatchdogVerdict {
     message: string;
@@ -118,7 +159,7 @@ class HeartbeatWatchdog {
         }
 
         this.options.onFailureNoted(
-            `[Task] Discord's heartbeat for "${questName}" failed (${this.consecutiveFailures}/${maxConsecutiveFailures}): ${why}`,
+            `[Task] Discord's heartbeat for "${questName}" failed (${this.consecutiveFailures}/${maxConsecutiveFailures}): ${why}`
         );
 
         if (this.beatCount > 0) this.arm();
@@ -152,22 +193,25 @@ class HeartbeatWatchdog {
     private silenceVerdict(): WatchdogVerdict {
         const { questName } = this.options;
         const failed = this.failedBeats;
-        const reason = failed > 0
-            ? `No heartbeat from Discord (${failed} failed beat(s))`
-            : "No heartbeat from Discord";
+        const reason =
+            failed > 0
+                ? `No heartbeat from Discord (${failed} failed beat(s))`
+                : "No heartbeat from Discord";
 
         if (this.beatCount === 0) {
             return {
-                message: failed > 0
-                    ? `[Task] Discord never reported progress for "${questName}". All ${failed} heartbeat(s) it tried failed, the last one ${this.lastFailure}.`
-                    : `[Task] Discord never reported progress for "${questName}". It is not accepting the injected process on this client, so there is nothing to wait for.`,
+                message:
+                    failed > 0
+                        ? `[Task] Discord never reported progress for "${questName}". All ${failed} heartbeat(s) it tried failed, the last one ${this.lastFailure}.`
+                        : `[Task] Discord never reported progress for "${questName}". It is not accepting the injected process on this client, so there is nothing to wait for.`,
                 reason,
             };
         }
 
-        const what = failed > 0
-            ? `after ${this.beatCount} update(s) and ${failed} failed beat(s), the last one ${this.lastFailure}.`
-            : `after ${this.beatCount} update(s).`;
+        const what =
+            failed > 0
+                ? `after ${this.beatCount} update(s) and ${failed} failed beat(s), the last one ${this.lastFailure}.`
+                : `after ${this.beatCount} update(s).`;
         return {
             message: `[Task] Discord stopped reporting progress for "${questName}" ${what} Giving up instead of idling.`,
             reason,
@@ -208,9 +252,18 @@ export async function completeDesktopQuest(
     const resolvedName = resolveApplicationName(quest);
 
     if (!applicationId) {
-        console.warn(`${LOG_PREFIX} Could not resolve applicationId — dumping quest structure:`);
-        console.warn(`${LOG_PREFIX} quest keys:`, Object.keys(quest));
-        console.warn(`${LOG_PREFIX} quest.config:`, JSON.stringify(quest.config ?? {}, null, 2));
+        console.warn(
+            `${LOG_PREFIX} Could not resolve applicationId for "${resolvedName}" — skipping quest.`
+        );
+        notify("Error", "Could not resolve game application ID", "error", quest.id);
+        completeQuestPill(quest.id, `${resolvedName} Failed`, "error");
+        removeProgressBar(quest.id, userId);
+        cleanupQuest(quest.id, userId);
+        taskFailureCounts.set(
+            `${config.taskName}:${config.questType}`,
+            (taskFailureCounts.get(`${config.taskName}:${config.questType}`) ?? 0) + 1
+        );
+        return false;
     }
 
     const currentProgress = config.getProgressFromQuest(quest, 0);
@@ -261,15 +314,41 @@ export async function completeDesktopQuest(
                     return;
                 }
 
-                const { realFunc } = config.spoofStore(
-                    storeLocal,
-                    applicationId ?? "",
-                    pid,
-                    gameData
-                );
+                await new Promise((r) => setTimeout(r, 2000));
+                const { realFunc } = config.spoofStore(storeLocal, applicationId, pid, gameData);
+                await new Promise((r) => setTimeout(r, 1000));
                 debugLog(
                     `${LOG_PREFIX} Spoofed ${config.questType}: ${resolvedName} (pid: ${pid}, id: ${applicationId ?? "MISSING"})`
                 );
+
+                // RUNNING_GAMES_CHANGE handlers read added/removed unconditionally, so send
+                // the full shape; never reuse it for other event types.
+                const dispatchGamesChange = () => {
+                    if (
+                        config.dispatchEvent !== "RUNNING_GAMES_CHANGE" ||
+                        !FluxDispatcherLocal?.dispatch
+                    ) {
+                        return;
+                    }
+                    try {
+                        FluxDispatcherLocal.dispatch({
+                            type: "RUNNING_GAMES_CHANGE",
+                            games: storeLocal?.getRunningGames?.() ?? [],
+                            added: [],
+                            removed: [],
+                        });
+                    } catch (e) {
+                        debugLog(`${LOG_PREFIX} Failed to dispatch ${config.dispatchEvent}:`, e);
+                    }
+                };
+
+                dispatchGamesChange();
+                for (const delay of [500, 1500, 3000, 5000]) {
+                    setTimeout(() => {
+                        if (completed || isPluginStopping) return;
+                        dispatchGamesChange();
+                    }, delay);
+                }
 
                 let lastServerProgress = currentProgress;
                 const startTime = Date.now();
@@ -284,17 +363,28 @@ export async function completeDesktopQuest(
                 let failureHandler: ((data: any) => void) | null = null;
                 let watchdog: HeartbeatWatchdog | null = null;
                 let completed = false;
+                let spoofRestored = false;
 
                 const cleanupSpoof = () => {
                     try {
                         if (updateTicker) clearInterval(updateTicker);
-                        config.restoreStore(storeLocal, realFunc);
+                        if (!spoofRestored) {
+                            spoofRestored = true;
+                            config.restoreStore(storeLocal, realFunc);
+                            dispatchGamesChange();
+                        }
                         if (FluxDispatcherLocal) {
                             if (successHandler) {
-                                FluxDispatcherLocal.unsubscribe("QUESTS_SEND_HEARTBEAT_SUCCESS", successHandler);
+                                FluxDispatcherLocal.unsubscribe(
+                                    "QUESTS_SEND_HEARTBEAT_SUCCESS",
+                                    successHandler
+                                );
                             }
                             if (failureHandler) {
-                                FluxDispatcherLocal.unsubscribe("QUESTS_SEND_HEARTBEAT_FAILURE", failureHandler);
+                                FluxDispatcherLocal.unsubscribe(
+                                    "QUESTS_SEND_HEARTBEAT_FAILURE",
+                                    failureHandler
+                                );
                             }
                         }
                     } catch (e) {
@@ -311,6 +401,9 @@ export async function completeDesktopQuest(
                     cleanupQuest(quest.id, userId);
                     resolve(success);
                 };
+
+                // Small delay before starting to track - Discord may take a moment to register the spoofed game
+                await new Promise((r) => setTimeout(r, 2000));
 
                 // Heartbeat watchdog - tracks both success and failure
                 watchdog = new HeartbeatWatchdog({
@@ -347,34 +440,50 @@ export async function completeDesktopQuest(
                         watchdog.beat();
 
                         const liveQuest = QuestsStore?.getQuest?.(quest.id);
-                        const progress = Math.floor(
+                        // QUESTS_SEND_HEARTBEAT_SUCCESS carries the fresh userStatus; prefer it over a stale store read.
+                        const progressQuest = data?.userStatus
+                            ? { ...(liveQuest ?? quest), userStatus: data.userStatus }
+                            : liveQuest;
+
+                        const reportedProgress = Math.floor(
                             config.getProgressFromHeartbeat(
-                                { ...data, liveQuest },
+                                { ...data, liveQuest: progressQuest },
                                 lastServerProgress
                             )
                         );
 
-                        if (progress > lastServerProgress) {
-                            lastServerProgress = progress;
+                        if (reportedProgress > lastServerProgress) {
+                            lastServerProgress = reportedProgress;
                         }
 
-                        const percent =
-                            progress >= secondsNeeded
-                                ? 100
-                                : Math.min(99, Math.floor((progress / secondsNeeded) * 100));
+                        const optimisticProgress = getOptimisticProgressSeconds(
+                            progressQuest,
+                            config.progressKey,
+                            lastServerProgress,
+                            secondsNeeded
+                        );
+                        const percent = getOptimisticPercent(
+                            optimisticProgress,
+                            reportedProgress,
+                            secondsNeeded
+                        );
                         updateProgressBar(quest.id, userId, percent);
                         debugLog(
-                            `${LOG_PREFIX} ${config.questType} progress: ${progress}/${secondsNeeded} (${percent}%)`
+                            `${LOG_PREFIX} ${config.questType} progress: ${reportedProgress}/${secondsNeeded} (${percent}%)`
                         );
 
-                        if (progress >= secondsNeeded) {
+                        if (reportedProgress >= secondsNeeded) {
                             debugLog(`${LOG_PREFIX} Quest completed!`);
-                            // hold the spoofed process for a randomized tail so the session
-                            // doesn't end on the exact second it finishes (configurable via playSessionTail setting)
-                            const tailMinutes = (settings.store as { playSessionTail?: number }).playSessionTail ?? 2;
-                            const tailMs = tailMinutes > 0
-                                ? Math.floor((0.4 + Math.random() * 0.6) * tailMinutes * 60 * 1000)
-                                : 0;
+                            // Hold the spoofed process for a randomized tail so it doesn't end exactly at completion.
+                            const tailMinutes =
+                                (settings.store as { playSessionTail?: number }).playSessionTail ??
+                                2;
+                            const tailMs =
+                                tailMinutes > 0
+                                    ? Math.floor(
+                                          (0.4 + Math.random() * 0.6) * tailMinutes * 60 * 1000
+                                      )
+                                    : 0;
                             setTimeout(() => {
                                 try {
                                     cleanupSpoof();
@@ -407,11 +516,14 @@ export async function completeDesktopQuest(
                         const status = error?.status ?? error?.httpStatus;
                         const code = error?.body?.code ?? error?.code;
                         const message = error?.body?.message ?? error?.message;
-                        const details = [
-                            status ? `HTTP ${status}` : null,
-                            code ? `code ${code}` : null,
-                            message ?? null,
-                        ].filter(Boolean).join(", ") || "unknown error";
+                        const details =
+                            [
+                                status ? `HTTP ${status}` : null,
+                                code ? `code ${code}` : null,
+                                message ?? null,
+                            ]
+                                .filter(Boolean)
+                                .join(", ") || "unknown error";
 
                         watchdog.fail(details);
                     } catch (e) {
@@ -455,19 +567,17 @@ export async function completeDesktopQuest(
                             lastServerProgress = liveProgress;
                         }
 
-                        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                        const estimatedProgress = Math.min(
-                            secondsNeeded,
-                            Math.max(lastServerProgress, currentProgress + elapsed)
+                        const optimisticProgress = getOptimisticProgressSeconds(
+                            liveQuest,
+                            config.progressKey,
+                            lastServerProgress,
+                            secondsNeeded
                         );
-
-                        const percent =
-                            liveProgress >= secondsNeeded
-                                ? 100
-                                : Math.min(
-                                      99,
-                                      Math.floor((estimatedProgress / secondsNeeded) * 100)
-                                  );
+                        const percent = getOptimisticPercent(
+                            optimisticProgress,
+                            liveProgress,
+                            secondsNeeded
+                        );
 
                         updateProgressBar(quest.id, userId, percent);
 
@@ -476,10 +586,15 @@ export async function completeDesktopQuest(
                             debugLog(
                                 `${LOG_PREFIX} ${config.questType} quest completed on backend!`
                             );
-                            const tailMinutes = (settings.store as { playSessionTail?: number }).playSessionTail ?? 2;
-                            const tailMs = tailMinutes > 0
-                                ? Math.floor((0.4 + Math.random() * 0.6) * tailMinutes * 60 * 1000)
-                                : 0;
+                            const tailMinutes =
+                                (settings.store as { playSessionTail?: number }).playSessionTail ??
+                                2;
+                            const tailMs =
+                                tailMinutes > 0
+                                    ? Math.floor(
+                                          (0.4 + Math.random() * 0.6) * tailMinutes * 60 * 1000
+                                      )
+                                    : 0;
                             setTimeout(() => {
                                 try {
                                     cleanupSpoof();
@@ -503,6 +618,20 @@ export async function completeDesktopQuest(
                 const cleanups = cleanupFunctions.get(key) || [];
                 cleanups.push(cleanupSpoof);
                 cleanupFunctions.set(key, cleanups);
+
+                // Nudge listeners to re-read RunningGameStore; the override persists until cleanup.
+                const respoofInterval = setInterval(() => {
+                    try {
+                        if (completed || isPluginStopping) {
+                            clearInterval(respoofInterval);
+                            return;
+                        }
+                        dispatchGamesChange();
+                    } catch (e) {
+                        debugLog(`${LOG_PREFIX} Respoof error:`, e);
+                    }
+                }, 5000);
+                cleanups.push(() => clearInterval(respoofInterval));
             } catch (error: any) {
                 console.error(`${LOG_PREFIX} Failed to complete ${config.questType} quest:`, error);
                 notify(

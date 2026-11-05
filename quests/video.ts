@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { rateLimitedPost } from "../core/api";
 import { LOG_PREFIX } from "../constants";
@@ -25,13 +25,12 @@ import { notify, completeQuestPill, updateQuestPill } from "../ui/notifications"
 import { removeProgressBar, updateProgressBar } from "../ui/progressBar";
 import { cleanupQuest } from "./manager";
 import { initializeQuestProgressBar } from "./questProgress";
-import { emitCompanionEvent, COMPANION_EVENT_CODES } from "../core/events";
 
 const MAX_VIDEO_ITERATIONS = 3600;
-const MAX_CONSECUTIVE_VIDEO_ERRORS = 10;
-const MAX_TIME = 25 * 60 * 1000; // 25 minute hard cap
 
-const rnd = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
+const VIDEO_POST_ATTEMPTS = 3;
+const VIDEO_POST_RETRY_BASE_MS = 2000;
+const MAX_CONSECUTIVE_VIDEO_ERRORS = 10;
 
 export async function completeVideoQuest(quest: Quest, userId: string): Promise<boolean> {
     const taskConfig = getTaskConfig(quest);
@@ -53,6 +52,10 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
         return true;
     }
     let secondsDone = quest.userStatus?.progress?.[taskName]?.value ?? 0;
+    // discord only credits progress near real elapsed time; trickle it in small steps
+    const maxFuture = 10;
+    const speed = 7;
+    const interval = 1;
     const enrolledAtRaw = quest.userStatus?.enrolledAt;
     const enrolledAt = enrolledAtRaw ? new Date(enrolledAtRaw).getTime() : Date.now();
     if (isNaN(enrolledAt)) {
@@ -63,31 +66,52 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
     const questName = getQuestName(quest, "Video Quest");
     updateQuestPill(quest.id, `Spoofing video for ${questName}`, 0);
     initializeQuestProgressBar(quest.id, userId);
-
-    emitCompanionEvent({
-        code: COMPANION_EVENT_CODES.TASK_STARTED,
-        category: "task",
-        level: "info",
-        message: `Started ${taskName} task for "${questName}".`,
-        questId: quest.id,
-        questName,
-        taskType: taskName,
-    });
-
     try {
+        const modules = getWebpackModules();
+        let apiModule: any = null;
+        if (modules && modules.length > 0) {
+            apiModule =
+                modules.find((x: any) => x?.exports?.Bo?.get)?.exports?.Bo ||
+                modules.find((x: any) => x?.exports?.tn?.get)?.exports?.tn ||
+                modules.find((x: any) => x?.exports?.HTTP?.get)?.exports?.HTTP;
+        }
+        debugLog(
+            `${LOG_PREFIX} Video quest apiModule found: ${apiModule ? "yes" : "no"} (modules: ${modules?.length ?? 0})`
+        );
+        const postProgress = async (timestamp: number) => {
+            let lastError: unknown = new Error("Video progress post failed");
+            for (let attempt = 0; attempt < VIDEO_POST_ATTEMPTS; attempt++) {
+                try {
+                    if (apiModule) {
+                        const res = await apiModule.post({
+                            url: `/quests/${quest.id}/video-progress`,
+                            body: { timestamp },
+                        });
+                        return res.body?.completed_at != null;
+                    } else {
+                        const res = await rateLimitedPost(`/quests/${quest.id}/video-progress`, {
+                            timestamp,
+                        });
+                        return res?.completed_at != null;
+                    }
+                } catch (e) {
+                    lastError = e;
+                    if (attempt < VIDEO_POST_ATTEMPTS - 1) {
+                        const backoffMs =
+                            VIDEO_POST_RETRY_BASE_MS * (attempt + 1) +
+                            Math.floor(Math.random() * 500);
+                        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+                    }
+                }
+            }
+            throw lastError;
+        };
         let iterations = 0;
         let consecutiveErrors = 0;
-        const startTime = Date.now();
         while (iterations++ < MAX_VIDEO_ITERATIONS) {
             const questData = activeQuests.get(key);
             if (!questData || !questData.isProcessing || isPluginStopping) {
                 removeProgressBar(quest.id, userId);
-                return false;
-            }
-            if (Date.now() - startTime > MAX_TIME) {
-                debugLog(`${LOG_PREFIX} Video quest timed out after 25m`);
-                notify("Quest Timeout", "Video quest timed out after 25 minutes", "error", quest.id);
-                cleanupQuest(quest.id, userId);
                 return false;
             }
             const maxAllowed = Math.floor((Date.now() - enrolledAt) / 1000) + 10;
@@ -95,39 +119,20 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
             const timestamp = secondsDone + 7;
             if (diff >= 7) {
                 try {
-                    completed = await rateLimitedPost(`/quests/${quest.id}/video-progress`, {
-                        timestamp: Math.min(secondsNeeded, timestamp + Math.random()),
-                    });
+                    completed = await postProgress(
+                        Math.min(secondsNeeded, timestamp + Math.random())
+                    );
                     consecutiveErrors = 0;
                     secondsDone = Math.min(secondsNeeded, timestamp);
                     const percent = Math.min(100, (secondsDone / secondsNeeded) * 100);
                     updateProgressBar(quest.id, userId, percent);
                     debugLog(`${LOG_PREFIX} Video progress: ${secondsDone}/${secondsNeeded}`);
-
-                    emitCompanionEvent({
-                        code: COMPANION_EVENT_CODES.HEARTBEAT_SUCCESS,
-                        category: "network",
-                        level: "info",
-                        message: `Video progress: ${secondsDone}/${secondsNeeded}`,
-                        questId: quest.id,
-                        questName,
-                        taskType: taskName,
-                    });
                 } catch (e) {
                     consecutiveErrors++;
                     console.warn(
                         `${LOG_PREFIX} Video progress error (${consecutiveErrors}/${MAX_CONSECUTIVE_VIDEO_ERRORS}):`,
                         e
                     );
-                    emitCompanionEvent({
-                        code: COMPANION_EVENT_CODES.HEARTBEAT_FAILURE,
-                        category: "network",
-                        level: "warning",
-                        message: `Video progress failed (${consecutiveErrors}/${MAX_CONSECUTIVE_VIDEO_ERRORS})`,
-                        questId: quest.id,
-                        questName,
-                        taskType: taskName,
-                    });
                     if (consecutiveErrors >= MAX_CONSECUTIVE_VIDEO_ERRORS) {
                         notify(
                             "Quest Error",
@@ -141,14 +146,12 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
                 }
             }
             if (timestamp >= secondsNeeded) break;
-            // Discord's player cadence: 7-9.5s (matches official client)
-            await new Promise((resolve) => setTimeout(resolve, rnd(7000, 9500)));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
         }
         if (!completed) {
+            // force a final report so the server records completion even if the loop exited early
             try {
-                await rateLimitedPost(`/quests/${quest.id}/video-progress`, {
-                    timestamp: secondsNeeded,
-                });
+                await postProgress(secondsNeeded);
             } catch (e) {
                 console.warn(`${LOG_PREFIX} Final video progress error:`, e);
             }
@@ -157,15 +160,6 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const verifiedQuest = QuestsStore?.getQuest(quest.id);
         if (completed || verifiedQuest?.userStatus?.completedAt) {
-            emitCompanionEvent({
-                code: COMPANION_EVENT_CODES.TASK_COMPLETED,
-                category: "task",
-                level: "success",
-                message: `Video quest "${questName}" completed!`,
-                questId: quest.id,
-                questName,
-                taskType: taskName,
-            });
             completeQuestPill(quest.id, `${questName} Completed!`, "success");
             cleanupQuest(quest.id, userId);
             return true;
@@ -181,15 +175,6 @@ export async function completeVideoQuest(quest: Quest, userId: string): Promise<
         }
     } catch (error: any) {
         console.error(`${LOG_PREFIX} Video quest error:`, error);
-        emitCompanionEvent({
-            code: COMPANION_EVENT_CODES.TASK_FAILED,
-            category: "task",
-            level: "error",
-            message: `Video quest "${questName}" failed: ${error?.message}`,
-            questId: quest.id,
-            questName,
-            taskType: taskName,
-        });
         notify(
             "Quest Error",
             "An error occurred. Your progress was likely saved - try again.",

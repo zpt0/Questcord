@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,14 +14,20 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { DataStore } from "@api/index";
 import { UserStore } from "@webpack/common";
 import { LOG_PREFIX, SAVED_QUESTS_KEY } from "../constants";
 import { accountReady, getOwner, keyFor, loadOwned } from "../core/account";
 import { settings } from "../settings";
-import { activeQuests, cleanupFunctions, debugLog, getProgressBarKey, taskFailureCounts } from "../core/state";
+import {
+    activeQuests,
+    cleanupFunctions,
+    debugLog,
+    getProgressBarKey,
+    taskFailureCounts,
+} from "../core/state";
 import { suppressConsole, restoreConsole } from "../core/utils";
 import { QuestsStore } from "../core/stores";
 import { discordApiGet, rateLimitedPost } from "../core/api";
@@ -43,18 +49,24 @@ import { completeStreamQuest } from "./stream";
 import { completeVideoQuest } from "./video";
 import { taskControlRegistry } from "./taskControl";
 import { emitCompanionEvent, COMPANION_EVENT_CODES } from "../core/events";
-import { assessQuestRunnability, questBlocker, recordOutcome, QuestOutcome, summarizeRun, summarizeSharedGameQuests, isQuestExpired, UNAUTOMATABLE_KEYS } from "./questRunnability";
+import {
+    assessQuestRunnability,
+    questBlocker,
+    recordOutcome,
+    QuestOutcome,
+    summarizeRun,
+    summarizeSharedGameQuests,
+    isQuestExpired,
+    UNAUTOMATABLE_KEYS,
+} from "./questRunnability";
 export const SAVED_STATE_KEY = SAVED_QUESTS_KEY;
 
 export const SAVED_STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const autoStartedQuests = new Set<string>();
 
-// Quest outcome tracking
 export const questOutcomes = new Map<string, QuestOutcome>();
-// Quests skipped because Orb-only filter is on
 export const orbFilterSkipped = new Set<string>();
-// Quests skipped because Achievement Bypass was off
 export const consentSkipped = new Set<string>();
 
 const BLACKLISTED_QUEST_ID = "1412491570820812933";
@@ -142,7 +154,6 @@ export function cleanupQuest(questId: string, userId: string) {
         console.warn(`${LOG_PREFIX} Failed to remove saved state:`, e);
     });
     emitSessionEnded(questId);
-    // Release task control if exists
     const control = taskControlRegistry.get(questId);
     if (control) {
         taskControlRegistry.release(questId, control.generation);
@@ -168,7 +179,6 @@ function getRunningNonVideoQuestId(): string | null {
     }
     return null;
 }
-// discord only tracks one non-video quest at a time; video quests can stack
 function canRunInParallel(newTaskType: string): {
     canRun: boolean;
     conflictQuestId: string | null;
@@ -464,7 +474,12 @@ export async function startQuest(
 
         const { detected, keys } = runnability;
         if (!detected) {
-            notify("Unknown Quest Type", "Could not determine quest type. Try accepting the quest manually first.", "error", questId);
+            notify(
+                "Unknown Quest Type",
+                "Could not determine quest type. Try accepting the quest manually first.",
+                "error",
+                questId
+            );
             recordOutcome(questOutcomes, questId, "blocked");
             return "invalid";
         }
@@ -550,7 +565,12 @@ export async function startQuest(
                     if (isDesktopApp) {
                         success = await completePlayQuest(quest, userId);
                     } else {
-                        notify("Desktop Required", "This quest requires Discord desktop app", "error", questId);
+                        notify(
+                            "Desktop Required",
+                            "This quest requires Discord desktop app",
+                            "error",
+                            questId
+                        );
                         cleanupQuest(questId, userId);
                         return "invalid";
                     }
@@ -559,7 +579,12 @@ export async function startQuest(
                     if (isDesktopApp) {
                         success = await completeStreamQuest(quest, userId);
                     } else {
-                        notify("Desktop Required", "This quest requires Discord desktop app", "error", questId);
+                        notify(
+                            "Desktop Required",
+                            "This quest requires Discord desktop app",
+                            "error",
+                            questId
+                        );
                         cleanupQuest(questId, userId);
                         return "invalid";
                     }

@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,12 +14,12 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { rateLimitedPost } from "../core/api";
 import { LOG_PREFIX } from "../constants";
 import { activeQuests, debugLog, getProgressBarKey, isPluginStopping } from "../core/state";
-import { ChannelStore, GuildChannelStore } from "../core/stores";
+import { ChannelStore, GuildChannelStore, getWebpackModules } from "../core/stores";
 import { Quest, getTaskConfig, getQuestName } from "../core/types";
 import { safeTimeout } from "../core/utils";
 import { settings } from "../settings";
@@ -75,7 +75,12 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
                     questName,
                     taskType: taskName,
                 });
-                notify("Achievement Complete", `${questName} completed via bypass`, "success", quest.id);
+                notify(
+                    "Achievement Complete",
+                    `${questName} completed via bypass`,
+                    "success",
+                    quest.id
+                );
                 return true;
             }
             emitCompanionEvent({
@@ -87,7 +92,12 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
                 questName: getQuestName(quest),
                 taskType: taskName,
             });
-            notify("Bypass Failed", "Achievement bypass failed. Check console for details.", "error", quest.id);
+            notify(
+                "Bypass Failed",
+                "Achievement bypass failed. Check console for details.",
+                "error",
+                quest.id
+            );
             return false;
         }
         notify(
@@ -127,6 +137,17 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
                 : heartbeatMode === "balanced"
                   ? [18, 22]
                   : [0.8, 1.5];
+        const modules = getWebpackModules();
+        let apiModule: any = null;
+        if (modules && modules.length > 0) {
+            apiModule =
+                modules.find((x: any) => x?.exports?.Bo?.get)?.exports?.Bo ||
+                modules.find((x: any) => x?.exports?.tn?.get)?.exports?.tn ||
+                modules.find((x: any) => x?.exports?.HTTP?.get)?.exports?.HTTP;
+        }
+        debugLog(
+            `${LOG_PREFIX} Activity apiModule found: ${apiModule ? "yes" : "no"} (modules: ${modules?.length ?? 0})`
+        );
         let iterations = 0;
         let consecutiveErrors = 0;
         let cur = readProgress(quest.userStatus, taskName);
@@ -162,24 +183,45 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
             }
             if (Date.now() - startTime > MAX_TIME) {
                 debugLog(`${LOG_PREFIX} Activity quest timed out after 25m`);
-                notify("Quest Timeout", "Activity quest timed out after 25 minutes", "error", quest.id);
+                notify(
+                    "Quest Timeout",
+                    "Activity quest timed out after 25 minutes",
+                    "error",
+                    quest.id
+                );
                 cleanupQuest(quest.id, userId);
                 return false;
             }
             try {
-                const res = await rateLimitedPost(`/quests/${quest.id}/heartbeat`, {
-                    stream_key: streamKey,
-                    terminal: false,
-                }, () => taskControlRegistry.isActive(quest.id, generation), signal ?? undefined);
+                let res;
+                if (apiModule) {
+                    const apiRes = await apiModule.post({
+                        url: `/quests/${quest.id}/heartbeat`,
+                        body: {
+                            stream_key: streamKey,
+                            terminal: false,
+                        },
+                    });
+                    res = apiRes?.body || apiRes;
+                } else {
+                    res = await rateLimitedPost(
+                        `/quests/${quest.id}/heartbeat`,
+                        {
+                            stream_key: streamKey,
+                            terminal: false,
+                        },
+                        () => taskControlRegistry.isActive(quest.id, generation),
+                        signal ?? undefined
+                    );
+                }
                 consecutiveErrors = 0;
-                const reported = res?.progress?.[taskName]?.value ?? res?.progress?.PLAY_ACTIVITY?.value;
+                const reported =
+                    res?.progress?.[taskName]?.value ?? res?.progress?.PLAY_ACTIVITY?.value;
                 if (typeof reported === "number") {
                     cur = reported;
                 }
                 const percent =
-                    targetNeeded > 0
-                        ? Math.min(99, Math.floor((cur / targetNeeded) * 100))
-                        : 0;
+                    targetNeeded > 0 ? Math.min(99, Math.floor((cur / targetNeeded) * 100)) : 0;
                 updateProgressBar(quest.id, userId, percent);
 
                 emitCompanionEvent({
@@ -195,10 +237,27 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
                 if (cur >= targetNeeded) {
                     for (let attempt = 0; attempt < TERMINAL_HEARTBEAT_ATTEMPTS; attempt++) {
                         try {
-                            await rateLimitedPost(`/quests/${quest.id}/heartbeat`, {
-                                stream_key: streamKey,
-                                terminal: true,
-                            }, () => taskControlRegistry.isActive(quest.id, generation), signal ?? undefined);
+                            let terminalRes;
+                            if (apiModule) {
+                                const apiRes = await apiModule.post({
+                                    url: `/quests/${quest.id}/heartbeat`,
+                                    body: {
+                                        stream_key: streamKey,
+                                        terminal: true,
+                                    },
+                                });
+                                terminalRes = apiRes?.body || apiRes;
+                            } else {
+                                terminalRes = await rateLimitedPost(
+                                    `/quests/${quest.id}/heartbeat`,
+                                    {
+                                        stream_key: streamKey,
+                                        terminal: true,
+                                    },
+                                    () => taskControlRegistry.isActive(quest.id, generation),
+                                    signal ?? undefined
+                                );
+                            }
                             break;
                         } catch (e) {
                             if (attempt >= TERMINAL_HEARTBEAT_ATTEMPTS - 1) {
@@ -252,7 +311,11 @@ export async function completeActivityQuest(quest: Quest, userId: string): Promi
                 continue;
             }
             const dynamicInterval = minInterval + Math.random() * (maxInterval - minInterval);
-            const shouldContinue = await taskControlRegistry.waitForDelay(quest.id, generation, dynamicInterval * 1000);
+            const shouldContinue = await taskControlRegistry.waitForDelay(
+                quest.id,
+                generation,
+                dynamicInterval * 1000
+            );
             if (!shouldContinue) {
                 removeProgressBar(quest.id, userId);
                 return false;
