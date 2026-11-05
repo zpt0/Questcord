@@ -229,7 +229,7 @@ export function pickExecutable(
 
     const win32 = (Array.isArray(executables) ? executables : [])
         .filter((x: any) => x?.os === "win32" && typeof x.name === "string" && x.name.length > 0)
-        .map((x: any) => String(x.name).replace(">", "").replace(/\\/g, "/"));
+        .map((x: any) => String(x.name).replace(/>/g, "").replace(/\\/g, "/"));
     if (win32.length === 0) return { exeName: fallbackExe, relPath: `${cleanName}/${fallbackExe}` };
 
     const rank = (n: string): string =>
