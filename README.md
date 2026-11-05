@@ -36,12 +36,6 @@
 
 ---
 
-<p align="center">
-  <strong>📜 Changelog</strong> — see <a href="CHANGELOG.md">CHANGELOG.md</a> for release notes and per-version changes.
-</p>
-
----
-
 <h2 align="center">About</h2>
 
 <p align="center">Questcord is a Vencord user plugin that completes Discord Quests automatically so you don't have to play them manually. It reads Discord's own quest stores, drives Discord's own authenticated API client, and shows real-time progress on pill overlays right in the Discord client.</p>
