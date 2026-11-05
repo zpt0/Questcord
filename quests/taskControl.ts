@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 export type Cleanup = () => void;
 
@@ -34,7 +34,7 @@ export interface TaskLifecycle {
 export function waitForTaskDelay(ms: number, signal: AbortSignal): Promise<boolean> {
     if (signal.aborted) return Promise.resolve(false);
 
-    return new Promise<boolean>(resolve => {
+    return new Promise<boolean>((resolve) => {
         let settled = false;
         let timer: ReturnType<typeof setTimeout>;
 
@@ -63,9 +63,9 @@ export class TaskControl {
 
     constructor(
         public readonly questId: string,
-        public readonly generation: number,
+        public readonly generation: number
     ) {
-        this.cancelled = new Promise<void>(resolve => {
+        this.cancelled = new Promise<void>((resolve) => {
             this.resolveCancelled = resolve;
         });
     }
@@ -150,10 +150,11 @@ export class TaskControlRegistry {
 
     waitForDelay(questId: string, generation: number, ms: number): Promise<boolean> {
         const control = this.controls.get(questId);
-        if (!control || control.generation !== generation || !control.active) return Promise.resolve(false);
+        if (!control || control.generation !== generation || !control.active)
+            return Promise.resolve(false);
 
-        return waitForTaskDelay(ms, control.controller.signal).then(completed =>
-            completed && this.isActive(questId, generation)
+        return waitForTaskDelay(ms, control.controller.signal).then(
+            (completed) => completed && this.isActive(questId, generation)
         );
     }
 
@@ -181,8 +182,8 @@ export class TaskControlRegistry {
 
     pauseAll(
         shouldPause: (questId: string) => boolean = () => true,
-        onCleanupError?: (error: unknown) => void,
-    ): { quests: number; cleanups: CleanupResult; } {
+        onCleanupError?: (error: unknown) => void
+    ): { quests: number; cleanups: CleanupResult } {
         let quests = 0;
         let ran = 0;
         let failed = 0;
@@ -227,7 +228,7 @@ export class TaskControlRegistry {
     release(
         questId: string,
         generation: number,
-        onCleanupError?: (error: unknown) => void,
+        onCleanupError?: (error: unknown) => void
     ): CleanupResult {
         const control = this.controls.get(questId);
         if (!control || control.generation !== generation) return { ran: 0, failed: 0 };
@@ -248,12 +249,18 @@ export class TaskControlRegistry {
         return removed;
     }
 
-    private cancelControl(control: TaskControl, onCleanupError?: (error: unknown) => void): CleanupResult {
+    private cancelControl(
+        control: TaskControl,
+        onCleanupError?: (error: unknown) => void
+    ): CleanupResult {
         control.cancel();
         return this.runCleanups(control, onCleanupError);
     }
 
-    private runCleanups(control: TaskControl, onCleanupError?: (error: unknown) => void): CleanupResult {
+    private runCleanups(
+        control: TaskControl,
+        onCleanupError?: (error: unknown) => void
+    ): CleanupResult {
         let ran = 0;
         let failed = 0;
         for (const cleanup of Array.from(control.cleanups)) {

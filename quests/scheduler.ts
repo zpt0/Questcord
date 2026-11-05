@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import type { TaskType } from "../core/types";
 import { settings } from "../settings";
@@ -23,7 +23,9 @@ export type SchedulerLane = "game" | "video";
 export type SchedulerQuestState = "running" | "waiting";
 
 export function schedulerLaneForTaskType(taskType: TaskType): SchedulerLane {
-    return taskType === "WATCH_VIDEO" || taskType === "WATCH_VIDEO_ON_MOBILE" || taskType === "WATCH_VIDEO_ON_DESKTOP"
+    return taskType === "WATCH_VIDEO" ||
+        taskType === "WATCH_VIDEO_ON_MOBILE" ||
+        taskType === "WATCH_VIDEO_ON_DESKTOP"
         ? "video"
         : "game";
 }
@@ -100,7 +102,8 @@ export class SchedulerMetadata {
         const quests: Record<string, SchedulerQuestSnapshot> = {};
 
         for (const task of tasks) {
-            if (!task.active || this.lanes[task.lane].token == null || quests[task.questId]) continue;
+            if (!task.active || this.lanes[task.lane].token == null || quests[task.questId])
+                continue;
             const state: SchedulerQuestState = task.started ? "running" : "waiting";
             quests[task.questId] = Object.freeze({ lane: task.lane, state });
             const lane = task.lane === "game" ? game : video;
@@ -255,7 +258,9 @@ export class Scheduler {
         this.videoToken = null;
     }
 
-    getRunnableTasks(allTasks: Iterable<{ questId: string; taskType: TaskType }>): Array<{ questId: string; taskType: TaskType }> {
+    getRunnableTasks(
+        allTasks: Iterable<{ questId: string; taskType: TaskType }>
+    ): Array<{ questId: string; taskType: TaskType }> {
         const result: Array<{ questId: string; taskType: TaskType }> = [];
         const gameTasks: Array<{ questId: string; taskType: TaskType }> = [];
         const videoTasks: Array<{ questId: string; taskType: TaskType }> = [];
@@ -267,7 +272,8 @@ export class Scheduler {
         }
 
         // Round-robin: alternate game and video
-        let gi = 0, vi = 0;
+        let gi = 0,
+            vi = 0;
         while (gi < gameTasks.length || vi < videoTasks.length) {
             if (gi < gameTasks.length) result.push(gameTasks[gi++]);
             if (vi < videoTasks.length) result.push(videoTasks[vi++]);
@@ -277,4 +283,11 @@ export class Scheduler {
     }
 }
 
-export const scheduler = new Scheduler();
+let schedulerInstance: Scheduler | null = null;
+
+export function getScheduler(): Scheduler {
+    if (!schedulerInstance) {
+        schedulerInstance = new Scheduler();
+    }
+    return schedulerInstance;
+}

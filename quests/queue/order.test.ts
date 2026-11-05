@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,12 +14,13 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { describe, expect, it } from "vitest";
 
 import {
     describeEntry,
+    getUnsupportedQuestReason,
     kindOf,
     isCompleted,
     isEnrolled,
@@ -135,6 +136,80 @@ describe("queue/order", () => {
         expect(isQueueable(makeQuest())).toBe(true);
         expect(isQueueable(makeQuest({ userStatus: { completedAt: "2026-01-01" } }))).toBe(false);
         expect(isQueueable(undefined)).toBe(false);
+    });
+
+    it("detects achievement quests that cannot be automated", () => {
+        expect(
+            getUnsupportedQuestReason(
+                makeQuest({
+                    config: { taskConfig: { tasks: { ACHIEVEMENT_IN_GAME: { target: 1 } } } },
+                })
+            )
+        ).toBe("achievement-in-game");
+
+        expect(
+            getUnsupportedQuestReason(
+                makeQuest({
+                    config: {
+                        taskConfig: { tasks: { ACHIEVEMENT_IN_ACTIVITY: { target: 100 } } },
+                    },
+                })
+            )
+        ).toBe("achievement-in-activity");
+
+        // A supported task alongside an achievement task wins, so no disabled button.
+        expect(
+            getUnsupportedQuestReason(
+                makeQuest({
+                    config: {
+                        taskConfig: {
+                            tasks: {
+                                ACHIEVEMENT_IN_GAME: { target: 1 },
+                                PLAY_ON_DESKTOP: { target: 100 },
+                            },
+                        },
+                    },
+                })
+            )
+        ).toBeNull();
+
+        expect(
+            getUnsupportedQuestReason(
+                makeQuest({
+                    config: {
+                        taskConfig: {
+                            tasks: {
+                                ACHIEVEMENT_IN_ACTIVITY: { target: 10 },
+                                PLAY_ACTIVITY: { target: 100 },
+                            },
+                        },
+                    },
+                })
+            )
+        ).toBeNull();
+    });
+
+    it("does not mark completed or expired achievement quests as unsupported", () => {
+        const achievement = {
+            config: { taskConfig: { tasks: { ACHIEVEMENT_IN_GAME: { target: 1 } } } },
+        };
+        expect(
+            getUnsupportedQuestReason(
+                makeQuest({ ...achievement, userStatus: { completedAt: "2026-01-01" } })
+            )
+        ).toBeNull();
+        expect(
+            getUnsupportedQuestReason(
+                makeQuest({
+                    ...achievement,
+                    config: {
+                        expiresAt: new Date(Date.now() - 1000).toISOString(),
+                        taskConfig: { tasks: { ACHIEVEMENT_IN_GAME: { target: 1 } } },
+                    },
+                })
+            )
+        ).toBeNull();
+        expect(getUnsupportedQuestReason(undefined)).toBeNull();
     });
 
     it("kindOf maps video tasks correctly", () => {

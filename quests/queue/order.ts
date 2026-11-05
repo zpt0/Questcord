@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import {
     ALL_TASK_TYPES,
@@ -28,7 +28,7 @@ import {
 export const CONSOLE_ONLY_KEYS = new Set(["PLAY_ON_XBOX", "PLAY_ON_PLAYSTATION"]);
 
 export function isConsoleOnly(keys: string[]): boolean {
-    return keys.length > 0 && keys.every(key => CONSOLE_ONLY_KEYS.has(key));
+    return keys.length > 0 && keys.every((key) => CONSOLE_ONLY_KEYS.has(key));
 }
 
 export interface QueueEntry {
@@ -76,6 +76,29 @@ export function isQueueable(quest: Quest | undefined, now = Date.now()): boolean
     if (!quest?.id) return false;
     const task = pickTask(quest);
     return task != null && !isCompleted(quest) && !isExpired(quest, now);
+}
+
+export type UnsupportedQuestReason = "achievement-in-game" | "achievement-in-activity";
+
+/**
+ * Detects quests that can be shown on a tile but cannot be automated by this
+ * client. Achievement-in-activity quests are only listed here; the UI decides
+ * whether Achievement Bypass makes them runnable. Completed and expired quests
+ * return null so they keep their normal "no button" state.
+ */
+export function getUnsupportedQuestReason(
+    quest: Quest | undefined,
+    now = Date.now()
+): UnsupportedQuestReason | null {
+    if (!quest?.id || isCompleted(quest) || isExpired(quest, now)) return null;
+
+    const task = pickTask(quest);
+    if (task === "ACHIEVEMENT_IN_ACTIVITY") return "achievement-in-activity";
+    if (task != null) return null;
+
+    const cfg = getTaskConfig(quest);
+    const keys = cfg?.tasks ? Object.keys(cfg.tasks) : [];
+    return keys.includes("ACHIEVEMENT_IN_GAME") ? "achievement-in-game" : null;
 }
 
 export function describeEntry(
