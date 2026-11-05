@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 .vc-pill-container {
     position: fixed;
@@ -638,6 +638,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     box-sizing: border-box;
+}
+
+.vc-questcord-unsupported-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.vc-questcord-unsupported-btn:disabled:hover {
+    transform: none;
 }
 
 .vc-questcord-queue-button-anchor {

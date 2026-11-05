@@ -3,3 +3,11 @@ export const UserStore = {
         return undefined;
     },
 };
+
+export function findStoreLazy(name: string) {
+    return null;
+}
+
+export function findByPropsLazy(...props: string[]) {
+    return null;
+}

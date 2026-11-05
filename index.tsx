@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import managedStyle from "./styles.css?managed";
 import { DataStore } from "@api/index";
@@ -60,7 +60,7 @@ import { DEFAULT_STALL_TIMEOUT_MS, startStallWatchdog, stopStallWatchdog } from 
 import { settings } from "./settings";
 import { initializeTraffic, setTrafficEngineRunning, clearTrafficQueue } from "./core/api";
 import { taskControlRegistry } from "./quests/taskControl";
-import { scheduler } from "./quests/scheduler";
+import { getScheduler } from "./quests/scheduler";
 import { emitCompanionEvent, COMPANION_EVENT_CODES } from "./core/events";
 
 const MENU_ANCHORS = ["share-link", "play-game", "display-disclosure"];
@@ -68,6 +68,23 @@ const MENU_ANCHORS = ["share-link", "play-game", "display-disclosure"];
 let lateResume: ReturnType<typeof setTimeout> | undefined;
 let knownAccountId: string | null = null;
 let pendingEnrollmentWake = false;
+let storesInitialized = false;
+const storesReadyCallbacks: Array<() => void> = [];
+
+function onStoresReady() {
+    storesInitialized = true;
+    for (const cb of storesReadyCallbacks) {
+        try {
+            cb();
+        } catch {}
+    }
+    storesReadyCallbacks.length = 0;
+}
+
+function waitForStores(): Promise<void> {
+    if (storesInitialized) return Promise.resolve();
+    return new Promise((resolve) => storesReadyCallbacks.push(resolve));
+}
 
 function clearEnrollmentWake(): void {
     pendingEnrollmentWake = false;
@@ -94,8 +111,7 @@ function isAnyRunning(): boolean {
 }
 
 function ensureStyleRootMounted() {
-    // vencord mounts its style root on DOMContentLoaded only, plugins that start
-    // later would end up unstyled without this
+    // vencord mounts its style root on DOMContentLoaded only; late plugins would be unstyled
     try {
         const root = document.querySelector("vencord-root");
         if (root && !root.isConnected) document.documentElement.append(root);
@@ -170,17 +186,16 @@ export function leaveAccount() {
     taskControlRegistry.clear();
     cleanupAllPills();
     resetResume();
-    scheduler.clear();
+    getScheduler().clear();
     setOwner(null);
 }
 
-export function enterAccount(userId: string) {
+export async function enterAccount(userId: string) {
     debugLog(`${LOG_PREFIX} Account switch: entering ${userId}`);
-    
+
     // Clear pending enrollment wake from previous account
     pendingEnrollmentWake = false;
-    
-    // Track account ID for switch detection
+
     if (knownAccountId && knownAccountId !== userId) {
         debugLog(`${LOG_PREFIX} Account changed from ${knownAccountId} to ${userId}`);
         emitCompanionEvent({
@@ -191,11 +206,14 @@ export function enterAccount(userId: string) {
         });
     }
     knownAccountId = userId;
-    
+
     setOwner(userId);
     resetResume();
+
+    // Wait for stores to be initialized before starting queue to avoid race condition
+    await waitForStores();
     void startQueue().then(() => scheduleTick());
-    
+
     if (settings.store.autoStart) {
         setTimeout(() => {
             if (!isAnyRunning()) {
@@ -284,6 +302,24 @@ export default definePlugin({
             scheduleEnrollmentWake();
         },
     },
+    onSettingChange(key: string, value: any) {
+        if (key === "orbQuestsOnly" && value === false) {
+            const restored = retryOrbFilterSkipped();
+            if (restored > 0) {
+                debugLog(`${LOG_PREFIX} Orb-only filter disabled, restored ${restored} quest(s)`);
+                notify("Orb Filter Off", `${restored} quest(s) re-added to queue`, "info");
+                void startQueue().then(() => scheduleTick());
+            }
+        }
+        if (key === "enableAchievementBypass" && value === true) {
+            const restored = retryConsentSkipped();
+            if (restored > 0) {
+                debugLog(`${LOG_PREFIX} Achievement bypass enabled, restored ${restored} quest(s)`);
+                notify("Achievement Bypass On", `${restored} quest(s) re-added to queue`, "info");
+                void startQueue().then(() => scheduleTick());
+            }
+        }
+    },
     start() {
         ensureStyleRootMounted();
         initDebug(settings.store);
@@ -291,42 +327,20 @@ export default definePlugin({
         setPluginStopping(false);
         resetResume();
 
-        // Listen for setting changes to retry skipped quests
-        settings.onChange("orbQuestsOnly", (value: boolean) => {
-            if (!value) {
-                const restored = retryOrbFilterSkipped();
-                if (restored > 0) {
-                    debugLog(`${LOG_PREFIX} Orb-only filter disabled, restored ${restored} quest(s)`);
-                    notify("Orb Filter Off", `${restored} quest(s) re-added to queue`, "info");
-                    void startQueue().then(() => scheduleTick());
-                }
-            }
-        });
-        settings.onChange("enableAchievementBypass", (value: boolean) => {
-            if (value) {
-                const restored = retryConsentSkipped();
-                if (restored > 0) {
-                    debugLog(`${LOG_PREFIX} Achievement bypass enabled, restored ${restored} quest(s)`);
-                    notify("Achievement Bypass On", `${restored} quest(s) re-added to queue`, "info");
-                    void startQueue().then(() => scheduleTick());
-                }
-            }
-        });
-
         // discord fills its quest stores lazily, so the resume check runs staged with retries
         setTimeout(() => {
             if (initializeStores()) {
                 // Initialize Traffic queue with Discord's API client
                 initializeTraffic(API);
                 setTrafficEngineRunning(true);
-                
+
                 setOwner(currentUserId(), { storeMayBeLoaded: true });
                 knownAccountId = currentUserId();
                 setupQuestVideoAutoDismiss();
+                onStoresReady(); // Signal that stores are ready for queue operations
                 debugLog(`${LOG_PREFIX} Ready!`);
-                
-                // Wait for QuestStore to be populated before first run
-                // Vencord starts plugins before Discord fetches quests; an empty store looks like "all done"
+
+                // Wait for QuestStore to load first; an empty store looks like "all done"
                 const waitForQuests = async () => {
                     const maxWait = 25000;
                     const start = Date.now();
@@ -335,16 +349,18 @@ export default definePlugin({
                         if (store && typeof store.getQuests === "function") {
                             const quests = store.getQuests();
                             if (quests && Object.keys(quests).length > 0) {
-                                debugLog(`${LOG_PREFIX} Quest list arrived after ${Date.now() - start}ms, ${Object.keys(quests).length} quest(s)`);
+                                debugLog(
+                                    `${LOG_PREFIX} Quest list arrived after ${Date.now() - start}ms, ${Object.keys(quests).length} quest(s)`
+                                );
                                 break;
                             }
                         }
-                        await new Promise(r => setTimeout(r, 200));
+                        await new Promise((r) => setTimeout(r, 200));
                     }
                     // Even if empty, don't treat as "all completed" - just proceed
                     debugLog(`${LOG_PREFIX} Proceeding with engine start`);
                 };
-                
+
                 void waitForQuests().then(() => {
                     void startQueue();
                     setTimeout(() => {
@@ -355,7 +371,7 @@ export default definePlugin({
                             .finally(() => scheduleTick());
                     }, 3000);
                 });
-                
+
                 lateResume = setTimeout(() => {
                     void checkAndResumeQuests()
                         .catch(() => {})

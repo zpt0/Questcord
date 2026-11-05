@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
@@ -61,7 +61,8 @@ export const settings = definePluginSettings({
     },
     playSessionTail: {
         type: OptionType.SLIDER,
-        description: "How long to keep the spoofed game running after quest completion (minutes, 0 = disabled)",
+        description:
+            "How long to keep the spoofed game running after quest completion (minutes, 0 = disabled)",
         default: 2,
         markers: [0, 1, 2, 3, 5, 10],
         hidden: true,
