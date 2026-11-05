@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
-*/
+ */
 
 /* eslint-disable no-useless-escape -- the \i placeholder in Discord's minified matchers is intentional */
 
