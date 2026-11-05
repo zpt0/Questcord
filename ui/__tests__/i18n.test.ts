@@ -25,7 +25,17 @@ describe("ui/i18n", () => {
             expect(messages.addToQueue).toBeTruthy();
             expect(messages.queue).toBeTruthy();
             expect(messages.cancel).toBeTruthy();
+            expect(messages.unsupported).toBeTruthy();
+            expect(messages.unsupportedAchievementInGame).toBeTruthy();
+            expect(messages.unsupportedAchievementBypassOff).toBeTruthy();
         }
+    });
+
+    it("exposes the unsupported achievement labels", () => {
+        expect(translateMessage("en-US", "unsupported")).toBe("Unsupported");
+        expect(resolveMessages("de").unsupportedAchievementBypassOff).toContain(
+            "Achievement-Bypass"
+        );
     });
 
     it("falls back to English for unknown locales", () => {
