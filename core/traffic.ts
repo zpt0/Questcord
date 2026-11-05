@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,13 +14,13 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { debugLog } from "./state";
 import { LOG_PREFIX } from "../constants";
 import { emitCompanionEvent, COMPANION_EVENT_CODES, companionFailure } from "../core/events";
 
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 const rnd = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
 
 const RETRYABLE = new Set([429, 500, 502, 503, 504, 408]);
@@ -138,7 +138,7 @@ export class Traffic {
         url: string,
         body: unknown,
         isActive: () => boolean = () => true,
-        signal?: AbortSignal,
+        signal?: AbortSignal
     ): Promise<T> {
         if (!this.isRunning()) return Promise.reject(new Error("Stopped"));
         if (!isActive() || signal?.aborted) return Promise.reject(cancelledError());
@@ -239,7 +239,9 @@ export class Traffic {
                     req.attempts++;
                     const delay = (e.body?.retry_after ?? Math.pow(2, req.attempts)) * 1000;
                     const isGlobal = e.body?.global === true;
-                    debugLog(`${LOG_PREFIX} [Traffic] Retry ${req.attempts}/${MAX_RETRIES} in ${(delay / 1000).toFixed(1)}s (HTTP ${err.status})`);
+                    debugLog(
+                        `${LOG_PREFIX} [Traffic] Retry ${req.attempts}/${MAX_RETRIES} in ${(delay / 1000).toFixed(1)}s (HTTP ${err.status})`
+                    );
                     const retryJitter = rnd(200, 800);
                     req.phase = "backoff";
 
@@ -264,7 +266,9 @@ export class Traffic {
                     emitNetworkFailure(req, err);
                     this.settleReject(req, e);
                 } else {
-                    debugLog(`${LOG_PREFIX} [Traffic] Request to ${req.url} failed: ${err.message}`);
+                    debugLog(
+                        `${LOG_PREFIX} [Traffic] Request to ${req.url} failed: ${err.message}`
+                    );
                     emitNetworkFailure(req, err);
                     this.settleReject(req, e);
                 }

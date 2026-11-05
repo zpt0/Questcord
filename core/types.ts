@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,14 +14,21 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 export interface TaskConfig {
     tasks: Record<string, { target: number; applications?: Array<{ id?: string; name?: string }> }>;
 }
 
 export interface QuestProgress {
-    [taskType: string]: { value: number };
+    [taskType: string]: {
+        value: number;
+        eventName?: string;
+        heartbeat?: {
+            lastBeatAt?: string | number;
+            expiresAt?: string | number;
+        };
+    };
 }
 
 export interface Quest {
@@ -64,6 +71,7 @@ export interface QuestData {
     targetProgress: number;
     lastProgressAt: number;
     stallWarned: boolean;
+    lastProgressUpdate?: number;
 }
 
 export interface SavedQuestState {
@@ -122,7 +130,16 @@ export function resolveApplicationId(quest: Quest): string | null {
             for (const t of Object.values(tc.tasks)) {
                 const apps = (t as any)?.applications;
                 if (Array.isArray(apps) && apps[0]?.id) return apps[0].id;
+                if ((t as any)?.application?.id) return (t as any).application.id;
+                if ((t as any)?.applicationId) return (t as any).applicationId;
             }
+        }
+    }
+    // Also check if apps are directly on quest
+    if ((quest as any)?.config?.tasks) {
+        for (const t of Object.values((quest as any).config.tasks)) {
+            const apps = (t as any)?.applications;
+            if (Array.isArray(apps) && apps[0]?.id) return apps[0].id;
         }
     }
     return (
@@ -132,6 +149,7 @@ export function resolveApplicationId(quest: Quest): string | null {
         quest.application?.id ??
         quest.applicationId ??
         quest.application_id ??
+        (quest as any)?.application?.applicationId ??
         null
     );
 }
@@ -140,8 +158,11 @@ export function resolveApplicationName(quest: Quest): string {
     return (
         quest.config?.application?.name ??
         quest.config?.applicationName ??
+        (quest.config as any)?.application?.name ??
         quest.application?.name ??
         quest.applicationName ??
+        (quest as any)?.name ??
+        (quest as any)?.config?.messages?.gameTitle ??
         "Unknown App"
     );
 }

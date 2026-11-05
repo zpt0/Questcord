@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 export const COMPANION_EVENT_CODES = {
     TASK_STARTED: "TASK_STARTED",
@@ -38,7 +38,7 @@ export const COMPANION_EVENT_CODES = {
     ACCOUNT_SWITCHED: "ACCOUNT_SWITCHED",
 } as const;
 
-export type CompanionEventCode = typeof COMPANION_EVENT_CODES[keyof typeof COMPANION_EVENT_CODES];
+export type CompanionEventCode = (typeof COMPANION_EVENT_CODES)[keyof typeof COMPANION_EVENT_CODES];
 
 export interface CompanionEventFailure {
     terminal: boolean;

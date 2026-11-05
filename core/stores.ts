@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { findByPropsLazy, findStoreLazy } from "@webpack";
 import { debugLog } from "./state";
@@ -27,9 +27,10 @@ export const ChannelStore = findStoreLazy("ChannelStore");
 export const GuildChannelStore = findStoreLazy("GuildChannelStore");
 export const api = findByPropsLazy("get", "post", "put", "patch");
 export const API = {
-    get: (options: { url: string }) => api?.get(options),
-    post: (options: { url: string; body: any; query?: any }) => api?.post(options),
-    del: (options: { url: string }) => api?.del(options),
+    get: (options: { url: string }) => api?.get(options.url),
+    post: (options: { url: string; body: any; query?: any }) =>
+        api?.post(options.url, options.body),
+    del: (options: { url: string }) => api?.del(options.url),
 };
 function getWebpackRequire(): any {
     try {

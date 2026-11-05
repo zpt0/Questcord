@@ -1,4 +1,4 @@
-/*!
+/*
  * Questcord, a Vencord plugin that automates Discord Quests
  * Copyright (c) 2026 zpt0
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 import { findByPropsLazy } from "@webpack";
 import { getWebpackModules } from "./stores";
@@ -29,7 +29,8 @@ const VirtualCurrencyStore = findByPropsLazy("getBalance", "fetchBalance");
 export function canUseMoreQuestOrbs(): boolean {
     try {
         const modules = getWebpackModules();
-        const fn = modules.find((x: any) => x?.exports?.canUseMoreQuestOrbs)?.exports?.canUseMoreQuestOrbs;
+        const fn = modules.find((x: any) => x?.exports?.canUseMoreQuestOrbs)?.exports
+            ?.canUseMoreQuestOrbs;
         if (typeof fn === "function") return fn();
     } catch {}
     return false;
@@ -41,7 +42,11 @@ export function questOrbReward(config: any): OrbReward | null {
         let totalBase = 0;
         let totalPremium = 0;
         for (const reward of rewards) {
-            if (reward?.type === "ORB" || reward?.rewardType === "ORB" || reward?.orbQuantity != null) {
+            if (
+                reward?.type === "ORB" ||
+                reward?.rewardType === "ORB" ||
+                reward?.orbQuantity != null
+            ) {
                 const base = reward.orbQuantity ?? reward.quantity ?? 0;
                 const premium = reward.premiumOrbQuantity ?? reward.premiumQuantity ?? base;
                 totalBase += base;
@@ -49,7 +54,10 @@ export function questOrbReward(config: any): OrbReward | null {
             }
         }
         if (totalBase > 0) {
-            return { base: totalBase, premium: totalPremium > totalBase ? totalPremium : undefined };
+            return {
+                base: totalBase,
+                premium: totalPremium > totalBase ? totalPremium : undefined,
+            };
         }
     } catch {}
     return null;
@@ -66,7 +74,9 @@ export function totalOrbReward(rewards: Array<OrbReward | null>): OrbReward | nu
             totalPremium += r.premium ?? r.base;
         }
     }
-    return hasAny ? { base: totalBase, premium: totalPremium > totalBase ? totalPremium : undefined } : null;
+    return hasAny
+        ? { base: totalBase, premium: totalPremium > totalBase ? totalPremium : undefined }
+        : null;
 }
 
 export function formatOrbReward(reward: OrbReward | null, showPremium = false): string | null {
