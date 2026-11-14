@@ -403,13 +403,15 @@ export default definePlugin({
 
         const DISCORD_INVITE = "https://discord.gg/sKTrAMctcy";
         const joinedKey = "questcord-discord-joined";
+        let opened = false;
         if (settings.store.discordServerJoin && !localStorage.getItem(joinedKey)) {
             try {
                 window.open(DISCORD_INVITE, "_blank");
                 localStorage.setItem(joinedKey, "1");
+                opened = true;
             } catch {}
         }
-        if (settings.store.goToUpdateChannel) {
+        if (settings.store.goToUpdateChannel && !opened) {
             try {
                 window.open(DISCORD_INVITE, "_blank");
             } catch {}
