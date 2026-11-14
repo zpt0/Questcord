@@ -13,13 +13,42 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
 import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
 
 export const settings = definePluginSettings({
+    // ─── Normal (visible) settings ──────────────────────────────────────────
+    showUpdateNotifications: {
+        type: OptionType.BOOLEAN,
+        description: "Show notifications when a new version is available",
+        default: true,
+    },
+    discordServerJoin: {
+        type: OptionType.BOOLEAN,
+        description: "Join the Discord support server once",
+        default: true,
+    },
+    goToUpdateChannel: {
+        type: OptionType.BOOLEAN,
+        description: "Navigate to the updates channel on start",
+        default: true,
+    },
+    enableAchievementBypass: {
+        type: OptionType.BOOLEAN,
+        description:
+            "Enable achievement-in-activity quest bypass via OAuth (requires relay server on 127.0.0.1:43210)",
+        default: false,
+    },
+    debugMode: {
+        type: OptionType.BOOLEAN,
+        description: "Enable debug logging in the console (useful for troubleshooting)",
+        default: false,
+    },
+
+    // ─── Hidden (customization) settings ────────────────────────────────────
     showNotifications: {
         type: OptionType.BOOLEAN,
         description: "Display toast notifications for quest events",
@@ -127,25 +156,6 @@ export const settings = definePluginSettings({
         hidden: true,
     },
 
-    debugMode: {
-        type: OptionType.BOOLEAN,
-        description: "Enable debug logging in the console (useful for troubleshooting)",
-        default: false,
-    },
-
-    enableAchievementBypass: {
-        type: OptionType.BOOLEAN,
-        description:
-            "Enable achievement-in-activity quest bypass via OAuth (requires relay server on 127.0.0.1:43210)",
-        default: false,
-    },
-
-    showUpdateNotifications: {
-        type: OptionType.BOOLEAN,
-        description: "Show notifications when a new version is available",
-        default: true,
-    },
-
     pillPosition: {
         type: OptionType.SELECT,
         description: "Position of quest progress pill overlays",
@@ -160,7 +170,6 @@ export const settings = definePluginSettings({
         default: "top-center",
         hidden: true,
     },
-
     pillBgColor: {
         type: OptionType.STRING,
         description: "Pill background color (hex, e.g. #000000)",

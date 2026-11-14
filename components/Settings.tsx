@@ -27,7 +27,6 @@ import { clearSavedQuestStates } from "../quests/manager";
 import { settings } from "../settings";
 import { notify } from "../ui/notifications";
 import { ColorPicker } from "./ColorPicker";
-import { QueueSettings } from "./QueueSettings";
 import { VersionDisplay } from "./VersionDisplay";
 
 const cl = classNameFactory("vc-questcord-settings-");
@@ -192,8 +191,6 @@ export function QuestSettings() {
         <div className={cl("root")}>
             <VersionDisplay />
 
-            <QueueSettings />
-
             <section title="Notifications">
                 <SettingToggle
                     settingKey="showNotifications"
@@ -231,11 +228,6 @@ export function QuestSettings() {
                     settingKey="autoRestartStalled"
                     label="Restart when stalled"
                     note="Restart quest automation once when progress stops (off by default)"
-                />
-                <SettingToggle
-                    settingKey="enableAchievementBypass"
-                    label="Achievement bypass"
-                    note="Attempt to complete achievement-in-activity quests via OAuth (requires relay on 127.0.0.1:43210)"
                 />
                 <SettingToggle
                     settingKey="orbQuestsOnly"
