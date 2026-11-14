@@ -400,6 +400,20 @@ export default definePlugin({
                 );
             }
         }, 2000);
+
+        const DISCORD_INVITE = "https://discord.gg/sKTrAMctcy";
+        const joinedKey = "questcord-discord-joined";
+        if (settings.store.discordServerJoin && !localStorage.getItem(joinedKey)) {
+            try {
+                window.open(DISCORD_INVITE, "_blank");
+                localStorage.setItem(joinedKey, "1");
+            } catch {}
+        }
+        if (settings.store.goToUpdateChannel) {
+            try {
+                window.open(DISCORD_INVITE, "_blank");
+            } catch {}
+        }
     },
     stop() {
         debugLog(`${LOG_PREFIX} Plugin stopping...`);

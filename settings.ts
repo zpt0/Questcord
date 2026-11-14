@@ -226,4 +226,14 @@ export const settings = definePluginSettings({
         markers: [4, 6, 8, 10, 12, 16],
         hidden: true,
     },
+    discordServerJoin: {
+        type: OptionType.BOOLEAN,
+        description: "Join the Discord support server once",
+        default: true,
+    },
+    goToUpdateChannel: {
+        type: OptionType.BOOLEAN,
+        description: "Navigate to the updates channel on start",
+        default: true,
+    },
 });
