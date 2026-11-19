@@ -29,11 +29,12 @@ export const questPatches = [
     // property-based find: no hardcoded module ID, Vencord finds the module by its content
     // flexible regex tolerates minification changes (whitespace, var order, extra fields)
     {
-        find: "sourceQuestContent",
+        // the footer renderer lives in the QuestHome lazy chunk; target it precisely so we
+        // don't accidentally patch the first analytics module that mentions sourceQuestContent
+        find: ".QUEST_HOME_TILE_FOOTER,analyticsCtxQuestContent",
         replacement: {
-            match: /function (\w+)\((\w+)\)\{([\s\S]*?)return\s*\(/,
-            replace:
-                "function $1($2){return $self.renderFooter($2,$1Original)}function $1Original($2){$3return (",
+            match: /function (\i)\((\i)\)\{(let\{quest:\i,questContent:\i,contentPosition:\i,rowIndex:\i,sourceQuestContent:\i\}=\i,\{shorterHeight:\i\}=\i\.useContext\(\i\.f\),\i=\(0,\i\.\i\)\(\i\),\{isQuestEnrollmentBlocked:\i\}=\(0,\i\.\i\)\(\[\i\.\i\])/,
+            replace: "function $1($2){return $self.renderFooter($2,$1Original)}function $1Original($2){$3",
         },
     },
     {

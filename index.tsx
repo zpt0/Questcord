@@ -17,14 +17,11 @@
  */
 
 import managedStyle from "./styles.css?managed";
-import { DataStore } from "@api/index";
 import { findGroupChildrenByChildId, type NavContextMenuPatchCallback } from "@api/ContextMenu";
 import definePlugin from "@utils/types";
 import { Menu } from "@webpack/common";
 import { QuestSettings } from "./components/Settings";
-import { showUpdateModal } from "./components/UpdateModal";
-import { PLUGIN_VERSION, UPDATE_CHECK_URL, UPDATE_CHECK_ENABLED, LOG_PREFIX } from "./constants";
-import { compareVersions } from "./core/utils";
+import { LOG_PREFIX, PLUGIN_VERSION } from "./constants";
 import { initializeStores, API, QuestsStore } from "./core/stores";
 import { getOwner, markQuestsLoaded, setOwner } from "./core/account";
 import { currentUserId } from "./core/user";
@@ -141,41 +138,6 @@ const questMenuPatch: NavContextMenuPatchCallback = (children, props: { quest?: 
         />
     );
 };
-
-async function checkForUpdates(): Promise<void> {
-    if (!UPDATE_CHECK_ENABLED) return;
-    if (!settings.store.showUpdateNotifications) return;
-
-    try {
-        const lastDismissed = (await DataStore.get("Questcord-dismissed-version")) as
-            string | undefined;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-        const response = await fetch(UPDATE_CHECK_URL, {
-            signal: controller.signal,
-            headers: { Accept: "application/vnd.github.v3+json" },
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) return;
-
-        const data = await response.json();
-        let latestVersion = data.tag_name || data.name || "";
-        latestVersion = latestVersion.replace(/^v/i, "").trim();
-
-        if (!latestVersion) return;
-
-        const comparison = compareVersions(latestVersion, PLUGIN_VERSION);
-
-        if (comparison > 0 && lastDismissed !== latestVersion) {
-            const releaseNotes = data.body || "No release notes available.";
-            showUpdateModal(latestVersion, releaseNotes);
-        }
-    } catch {}
-}
 
 export function leaveAccount() {
     debugLog(`${LOG_PREFIX} Account switch: leaving ${getOwner() ?? "unknown"}`);
@@ -377,7 +339,6 @@ export default definePlugin({
                         .catch(() => {})
                         .finally(() => scheduleTick());
                 }, 10_000);
-                setTimeout(() => checkForUpdates(), 5000);
                 startStallWatchdog(DEFAULT_STALL_TIMEOUT_MS, {
                     shouldAutoRestart: () => settings.store.autoRestartStalled === true,
                     onRestart: (questId: string) => {
@@ -400,24 +361,6 @@ export default definePlugin({
                 );
             }
         }, 2000);
-
-        const DISCORD_INVITE = "https://discord.gg/sKTrAMctcy";
-        const joinedKey = "zpt0-discord-invite-joined";
-        let opened = false;
-        if (settings.store.discordServerJoin) {
-            try {
-                if (!localStorage.getItem(joinedKey)) {
-                    window.open(DISCORD_INVITE, "_blank");
-                    localStorage.setItem(joinedKey, "1");
-                }
-                opened = true;
-            } catch {}
-        }
-        if (settings.store.goToUpdateChannel && !opened && !localStorage.getItem(joinedKey)) {
-            try {
-                window.open(DISCORD_INVITE, "_blank");
-            } catch {}
-        }
     },
     stop() {
         debugLog(`${LOG_PREFIX} Plugin stopping...`);
