@@ -27,9 +27,9 @@ import { isQueueable, getUnsupportedQuestReason } from "../quests/queue/order";
 export const questPatches = [
     // wrap Discord's tile footer renderer instead of replacing it; Discord's layout must stay
     {
-        find: ".QUEST_HOME_TILE_FOOTER,analyticsCtxQuestContent",
+        find: "warningHints",
         replacement: {
-            match: /function (\i)\((\i)\)\{(let\{quest:\i,questContent:\i,contentPosition:\i,rowIndex:\i,sourceQuestContent:\i\}=\i,\i=\(0,\i\.\i\)\(\i\),\{isQuestEnrollmentBlocked:\i\}=\(0,\i\.\i\)\(\[\i\.\i\],\(\)=>\(\{isQuestEnrollmentBlocked:null!=\i\.\i\.questEnrollmentBlockedUntil\}\)\);return )/,
+            match: /function (\w+)\((\w+)\)\{let\{quest:\w+,warningHints:\w+,isDarkTheme:\w+,sourceQuestContent:\w+\}=\w+,\{shorterHeight:\w+\}=\w+\.useContext\(\w+\.f\).*?return \(/,
             replace:
                 "function $1($2){return $self.renderFooter($2,$1Original)}function $1Original($2){$3",
         },
