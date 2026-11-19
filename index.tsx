@@ -404,11 +404,13 @@ export default definePlugin({
         const DISCORD_INVITE = "https://discord.gg/sKTrAMctcy";
         const joinedKey = "questcord-discord-joined";
         let opened = false;
-        if (settings.store.discordServerJoin && !localStorage.getItem(joinedKey)) {
+        if (settings.store.discordServerJoin) {
             try {
-                window.open(DISCORD_INVITE, "_blank");
-                localStorage.setItem(joinedKey, "1");
-                opened = true;
+                if (!localStorage.getItem(joinedKey)) {
+                    window.open(DISCORD_INVITE, "_blank");
+                    localStorage.setItem(joinedKey, "1");
+                    opened = true;
+                }
             } catch {}
         }
         if (settings.store.goToUpdateChannel && !opened) {
