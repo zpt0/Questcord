@@ -34,7 +34,8 @@ export const questPatches = [
         find: ".QUEST_HOME_TILE_FOOTER,analyticsCtxQuestContent",
         replacement: {
             match: /function (\i)\((\i)\)\{(let\{quest:\i,questContent:\i,contentPosition:\i,rowIndex:\i,sourceQuestContent:\i\}=\i,\{shorterHeight:\i\}=\i\.useContext\(\i\.f\),\i=\(0,\i\.\i\)\(\i\),\{isQuestEnrollmentBlocked:\i\}=\(0,\i\.\i\)\(\[\i\.\i\])/,
-            replace: "function $1($2){return $self.renderFooter($2,$1Original)}function $1Original($2){$3",
+            replace:
+                "function $1($2){return $self.renderFooter($2,$1Original)}function $1Original($2){$3",
         },
     },
     {
