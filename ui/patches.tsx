@@ -26,12 +26,12 @@ import { isQueueable, getUnsupportedQuestReason } from "../quests/queue/order";
 
 export const questPatches = [
     // wrap Discord's tile footer renderer instead of replacing it; Discord's layout must stay
-    // use a property-based find (no hardcoded module ID) and a flexible regex that tolerates
-    // Discord's frequent minification changes (whitespace, variable order, extra fields)
+    // property-based find: no hardcoded module ID, Vencord finds the module by its content
+    // flexible regex tolerates minification changes (whitespace, var order, extra fields)
     {
         find: "sourceQuestContent",
         replacement: {
-            match: /function (\w+)\((\w+)\)\{([\s\S]*?)return \(/,
+            match: /function (\w+)\((\w+)\)\{([\s\S]*?)return\s*\(/,
             replace:
                 "function $1($2){return $self.renderFooter($2,$1Original)}function $1Original($2){$3return (",
         },
