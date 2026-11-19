@@ -402,7 +402,7 @@ export default definePlugin({
         }, 2000);
 
         const DISCORD_INVITE = "https://discord.gg/sKTrAMctcy";
-        const joinedKey = "questcord-discord-joined";
+        const joinedKey = "zpt0-discord-invite-joined";
         let opened = false;
         if (settings.store.discordServerJoin) {
             try {
