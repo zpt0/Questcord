@@ -1,0 +1,198 @@
+/*
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import { findByCodeLazy, findByPropsLazy, findStoreLazy } from "@webpack";
+import { debugLog } from "./state";
+import { suppressConsole, restoreConsole } from "./utils";
+import { createScopedLogger } from "../foundation/core/logging";
+
+const log = createScopedLogger("core/stores");
+
+export let QuestsStore: any = null;
+export const RunningGameStore = findStoreLazy("RunningGameStore");
+export const ApplicationStreamingStore = findStoreLazy("ApplicationStreamingStore");
+export const ChannelStore = findStoreLazy("ChannelStore");
+export const GuildChannelStore = findStoreLazy("GuildChannelStore");
+export const api = findByPropsLazy("get", "post", "put", "patch");
+export const API = {
+    get: (options: { url: string }) => api?.get(options.url),
+    post: (options: { url: string; body: any; query?: any }) =>
+        api?.post(options.url, options.body),
+    del: (options: { url: string }) => api?.del(options.url),
+};
+
+/** Discord's native claim action creator. Keeps sealed metadata + CAPTCHA interceptor intact. */
+type ClaimQuestReward = (questId: string, platform: number, location: number) => Promise<unknown>;
+export const claimQuestReward = findByCodeLazy(
+    "QUESTS_CLAIM_REWARD_BEGIN",
+    "QUESTS_CLAIM_REWARD_SUCCESS",
+    "QUESTS_CLAIM_REWARD_FAILURE"
+) as ClaimQuestReward;
+
+type FetchQuestRewardCode = (questId: string) => Promise<unknown>;
+export const fetchQuestRewardCode = findByCodeLazy(
+    "QUESTS_FETCH_REWARD_CODE_BEGIN",
+    "QUESTS_FETCH_REWARD_CODE_SUCCESS",
+    "QUESTS_FETCH_REWARD_CODE_FAILURE"
+) as FetchQuestRewardCode;
+function getWebpackRequire(): any {
+    try {
+        const webpackChunk = (window as any).webpackChunkdiscord_app;
+        if (!webpackChunk) return null;
+        // push/pop a dummy chunk to grab webpack's require; discord exposes no handle
+        const wpRequire = webpackChunk.push([[Symbol()], {}, (req: any) => req]);
+        webpackChunk.pop();
+        return wpRequire;
+    } catch {
+        return null;
+    }
+}
+export function getWebpackModules(): any[] {
+    const wpRequire = getWebpackRequire();
+    if (!wpRequire?.c) return [];
+    return Object.values(wpRequire.c);
+}
+export function initializeStores(): boolean {
+    try {
+        const modules = getWebpackModules();
+        if (!modules || modules.length === 0) {
+            log.error(`Webpack modules not accessible`);
+            return false;
+        }
+        function isFluxStore(obj: any): boolean {
+            if (!obj) return false;
+            return !!(
+                obj._dispatcher ||
+                obj.__proto__?._dispatcher ||
+                obj.emitChange ||
+                obj.__proto__?.emitChange
+            );
+        }
+        QuestsStore = null;
+        for (const mod of modules as any[]) {
+            const exp = mod?.exports;
+            if (!exp) continue;
+            const candidates = [exp, exp.default, exp.Z, exp.ZP, exp.A];
+            for (const c of candidates) {
+                if (!c) continue;
+                if ((c.getQuest || c.__proto__?.getQuest) && isFluxStore(c)) {
+                    const origConsole = suppressConsole("warn");
+                    try {
+                        // unrelated modules answer getQuest("1") with an i18n ast stub,
+                        // so only accept candidates that don't come back with one
+                        const q = c.getQuest?.("1");
+                        if (!q || (!q.locale && !q.ast)) {
+                            QuestsStore = c;
+                        }
+                    } catch (e) {
+                        debugLog(`Store candidate test failed:`, e);
+                    }
+                    restoreConsole(origConsole);
+                    if (QuestsStore) break;
+                }
+            }
+            if (QuestsStore) break;
+            for (const key of Object.keys(exp)) {
+                const val = exp[key];
+                if (!val) continue;
+                if ((val.getQuest || val.__proto__?.getQuest) && isFluxStore(val)) {
+                    const origConsole = suppressConsole("warn");
+                    try {
+                        const q = val.getQuest?.("1");
+                        if (!q || (!q.locale && !q.ast)) {
+                            QuestsStore = val;
+                        }
+                    } catch (e) {
+                        debugLog(`Store candidate test failed:`, e);
+                    }
+                    restoreConsole(origConsole);
+                    if (QuestsStore) break;
+                }
+            }
+            if (QuestsStore) break;
+        }
+        const questsOk = !!QuestsStore;
+        const apiOk = !!api;
+        debugLog(`Store status:`, {
+            QuestsStore: questsOk,
+            RunningGameStore: !!RunningGameStore,
+            ApplicationStreamingStore: !!ApplicationStreamingStore,
+            ChannelStore: !!ChannelStore,
+            GuildChannelStore: !!GuildChannelStore,
+            api: apiOk,
+        });
+        if (questsOk) {
+            try {
+                const storeName = QuestsStore.getName?.();
+                debugLog(`QuestsStore name:`, storeName);
+                if (typeof QuestsStore.getQuests === "function") {
+                    const quests = QuestsStore.getQuests();
+                    const count = Array.isArray(quests)
+                        ? quests.length
+                        : Object.keys(quests || {}).length;
+                    debugLog(`Quests available:`, count);
+                    const questList = Array.isArray(quests) ? quests : Object.values(quests || {});
+                    if (questList.length > 0) {
+                        const first = questList[0] as any;
+                        debugLog(`First quest keys:`, Object.keys(first));
+                        debugLog(`First quest sample:`, {
+                            id: first.id,
+                            hasConfig: !!first.config,
+                            hasUserStatus: !!first.userStatus,
+                            hasTaskConfig: !!first.taskConfig,
+                            configKeys: first.config ? Object.keys(first.config) : "none",
+                        });
+                    }
+                }
+            } catch (e) {
+                log.warn(`Store inspection error:`, e);
+            }
+        }
+        if (!questsOk && !apiOk) {
+            log.error(`Critical stores missing - plugin cannot function`);
+            return false;
+        }
+        debugLog(`Stores initialized successfully`);
+        return true;
+    } catch (error) {
+        log.error(`Failed to initialize stores:`, error);
+        return false;
+    }
+}
+export function findFluxDispatcher(): any {
+    try {
+        const mod = findByPropsLazy("dispatch", "subscribe");
+        return mod || null;
+    } catch {
+        return null;
+    }
+}
+
+export function questsLoaded(): boolean {
+    try {
+        if (typeof QuestsStore?.getQuests === "function") {
+            const quests = QuestsStore.getQuests();
+            if (Array.isArray(quests)) return quests.length > 0;
+            if (quests && typeof quests === "object") return Object.keys(quests).length > 0;
+        }
+        if (typeof QuestsStore?.getQuest === "function") return true;
+        return !!QuestsStore;
+    } catch {
+        return !!QuestsStore;
+    }
+}

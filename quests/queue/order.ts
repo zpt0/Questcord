@@ -1,0 +1,182 @@
+/*
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import {
+    ALL_TASK_TYPES,
+    getQuestName,
+    getTaskConfig,
+    isVideoTask,
+    type Quest,
+    type TaskType,
+} from "../../core/types";
+import { isEnrollmentRequested } from "../enrollmentMemory";
+
+export const CONSOLE_ONLY_KEYS = new Set(["PLAY_ON_XBOX", "PLAY_ON_PLAYSTATION"]);
+
+export function isConsoleOnly(keys: string[]): boolean {
+    return keys.length > 0 && keys.every((key) => CONSOLE_ONLY_KEYS.has(key));
+}
+
+export interface QueueEntry {
+    questId: string;
+    addedAt: number;
+}
+
+export type QueueKind = "video" | "game";
+export type RowState = "running" | "ready" | "needs-accept" | "unavailable";
+
+export interface QueueRow {
+    entry: QueueEntry;
+    quest: Quest | undefined;
+    task: TaskType | null;
+    kind: QueueKind | null;
+    state: RowState;
+}
+
+export const kindOf = (task: TaskType): QueueKind => (isVideoTask(task) ? "video" : "game");
+
+/** Earlier expiry wins; rows without an expiry sort last. */
+export function expiresAtOf(quest: Quest | undefined): number {
+    const raw = quest?.config?.expiresAt ?? quest?.expiresAt;
+    if (raw == null) return Number.POSITIVE_INFINITY;
+    const value = typeof raw === "number" ? raw : new Date(raw).getTime();
+    return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
+}
+
+export function pickTask(quest: Quest): TaskType | null {
+    const cfg = getTaskConfig(quest);
+    if (!cfg?.tasks) return null;
+    const keys = Object.keys(cfg.tasks);
+    if (isConsoleOnly(keys)) return null;
+    // first type that exists wins; ALL_TASK_TYPES order sets the priority
+    return ALL_TASK_TYPES.find((t) => cfg.tasks[t] != null) ?? null;
+}
+
+export function isCompleted(quest: Quest): boolean {
+    return !!quest.userStatus?.completedAt;
+}
+
+export function isEnrolled(quest: Quest): boolean {
+    return !!quest.userStatus?.enrolledAt;
+}
+
+export function isExpired(quest: Quest, now = Date.now()): boolean {
+    const expiresAt = quest.config?.expiresAt ?? quest.expiresAt;
+    if (!expiresAt) return false;
+    return new Date(expiresAt).getTime() <= now;
+}
+
+export function isQueueable(quest: Quest | undefined, now = Date.now()): boolean {
+    if (!quest?.id) return false;
+    const task = pickTask(quest);
+    return task != null && !isCompleted(quest) && !isExpired(quest, now);
+}
+
+export type UnsupportedQuestReason = "achievement-in-game" | "achievement-in-activity";
+
+/**
+ * Detects quests that can be shown on a tile but cannot be automated by this
+ * client. Achievement-in-activity quests are only listed here; the UI decides
+ * whether Achievement Bypass makes them runnable. Completed and expired quests
+ * return null so they keep their normal "no button" state.
+ */
+export function getUnsupportedQuestReason(
+    quest: Quest | undefined,
+    now = Date.now()
+): UnsupportedQuestReason | null {
+    if (!quest?.id || isCompleted(quest) || isExpired(quest, now)) return null;
+
+    const task = pickTask(quest);
+    if (task === "ACHIEVEMENT_IN_ACTIVITY") return "achievement-in-activity";
+    if (task != null) return null;
+
+    const cfg = getTaskConfig(quest);
+    const keys = cfg?.tasks ? Object.keys(cfg.tasks) : [];
+    return keys.includes("ACHIEVEMENT_IN_GAME") ? "achievement-in-game" : null;
+}
+
+export function describeEntry(
+    entry: QueueEntry,
+    quest: Quest | undefined,
+    running: boolean,
+    now = Date.now()
+): QueueRow {
+    const task = quest ? pickTask(quest) : null;
+    const kind = task ? kindOf(task) : null;
+    let state: RowState;
+    if (running) state = "running";
+    else if (!quest || !task || isCompleted(quest) || isExpired(quest, now)) state = "unavailable";
+    else if (!isEnrolled(quest) && !isEnrollmentRequested(entry.questId)) state = "needs-accept";
+    else state = "ready";
+    return { entry, quest, task, kind, state };
+}
+
+/**
+ * Sorts rows so running quests appear first, then orders each lane by expiry
+ * (soonest first) and alternates video/game. One video, one game, one video, …
+ */
+export function sortRows(rows: readonly QueueRow[]): QueueRow[] {
+    const array = [...rows];
+    const running: QueueRow[] = [];
+    const videos: QueueRow[] = [];
+    const games: QueueRow[] = [];
+    const other: QueueRow[] = [];
+
+    for (const row of array) {
+        if (row.state === "running") running.push(row);
+        else if (row.kind === "video") videos.push(row);
+        else if (row.kind === "game") games.push(row);
+        else other.push(row);
+    }
+
+    // sort each lane by expiry first, insertion order only breaks ties
+    const byExpiry = (a: QueueRow, b: QueueRow) => {
+        const aExpiry = expiresAtOf(a.quest);
+        const bExpiry = expiresAtOf(b.quest);
+        if (aExpiry !== bExpiry) return aExpiry - bExpiry;
+        return a.entry.addedAt - b.entry.addedAt;
+    };
+    videos.sort(byExpiry);
+    games.sort(byExpiry);
+    other.sort(byExpiry);
+
+    // alternate video and game, starting with video
+    const alternated: QueueRow[] = [];
+    let vi = 0,
+        gi = 0;
+    while (vi < videos.length || gi < games.length) {
+        if (vi < videos.length) alternated.push(videos[vi++]);
+        if (gi < games.length) alternated.push(games[gi++]);
+    }
+
+    return [...running, ...alternated, ...other];
+}
+
+export function pickNextOfKind(rows: readonly QueueRow[], kind: QueueKind): QueueRow | undefined {
+    return sortRows(rows.filter((r) => r.state === "ready" && r.kind === kind))[0];
+}
+
+export function pickNext(rows: readonly QueueRow[]): QueueRow | undefined {
+    return pickNextOfKind(rows, "video") ?? pickNextOfKind(rows, "game");
+}
+
+export function pickToAccept(rows: readonly QueueRow[]): QueueRow | undefined {
+    return sortRows(rows.filter((r) => r.state === "needs-accept"))[0];
+}
+
+export { getQuestName };

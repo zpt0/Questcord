@@ -1,0 +1,26 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "jsx": "react-jsx",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "declaration": false,
+        "types": ["node"],
+        "paths": {
+            "@api/*": ["./stubs/api/*"],
+            "@components/*": ["./stubs/components/*"],
+            "@utils/*": ["./stubs/utils/*"],
+            "@webpack/*": ["./stubs/webpack/*"],
+            "@webpack": ["./stubs/webpack/index.d.ts"],
+            "@vencord/discord-types": ["./stubs/vencord/discord-types.d.ts"],
+            "@vencord/*": ["./stubs/vencord/*"]
+        }
+    },
+    "include": ["**/*.ts", "**/*.tsx", "./stubs/**/*.d.ts"],
+    "exclude": ["node_modules"]
+}

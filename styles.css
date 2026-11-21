@@ -1,0 +1,924 @@
+/*
+ * Questcord, a Vencord plugin that automates Discord Quests
+ * Copyright (c) 2026 zpt0
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+/* ─── Container ───────────────────────────────────────────── */
+/* Placement stays on .qc-pos-* classes from pillStyles.ts so the runtime
+   contract is unchanged; only the visual anchoring follows Clonecord. */
+.vc-pill-container {
+    position: fixed;
+    z-index: 2147483647;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+    width: auto;
+    max-width: var(--qc-max-width, 400px);
+    padding: 0;
+    box-sizing: border-box;
+    /* --qc-* are set at runtime by applyPillContainerStyle in pillStyles.ts */
+    --qc-accent: #5865f2;
+    --qc-accent-rgb: 88, 101, 242;
+    --qc-bg: rgba(0, 0, 0, 0.85);
+    --qc-text: #ffffff;
+    --qc-percent: #43b581;
+    --qc-bar-bg: #333333;
+    --qc-border: rgba(255, 255, 255, 0.08);
+    --qc-radius: 10px;
+    --qc-font-size: 13px;
+    --qc-padding: 10px;
+    --qc-max-width: 400px;
+    --qc-slide: translateY(-40px);
+    --qc-origin: top center;
+    overflow: visible;
+}
+
+/* Let children (pills) be clickable despite container pointer-events: none. */
+.vc-pill-container > * {
+    pointer-events: auto;
+}
+
+.vc-pill-container::-webkit-scrollbar {
+    display: none;
+}
+
+/* ─── Position variants — placement lives in CSS, not inline styles ── */
+.vc-pill-container.qc-pos-top-left {
+    top: 16px;
+    left: 16px;
+    right: auto;
+    bottom: auto;
+    transform: none;
+    align-items: flex-start;
+    --qc-slide: translateX(-40px);
+    --qc-origin: top left;
+}
+
+.vc-pill-container.qc-pos-top-center {
+    top: 16px;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translateX(-50%);
+    align-items: center;
+    --qc-slide: translateY(-40px);
+    --qc-origin: top center;
+}
+
+.vc-pill-container.qc-pos-top-right {
+    top: 16px;
+    right: 16px;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    align-items: flex-end;
+    --qc-slide: translateX(40px);
+    --qc-origin: top right;
+}
+
+.vc-pill-container.qc-pos-bottom-left {
+    bottom: 16px;
+    left: 16px;
+    right: auto;
+    top: auto;
+    transform: none;
+    align-items: flex-start;
+    --qc-slide: translateX(-40px);
+    --qc-origin: bottom left;
+}
+
+.vc-pill-container.qc-pos-bottom-center {
+    bottom: 16px;
+    left: 50%;
+    right: auto;
+    top: auto;
+    transform: translateX(-50%);
+    align-items: center;
+    --qc-slide: translateY(40px);
+    --qc-origin: bottom center;
+}
+
+.vc-pill-container.qc-pos-bottom-right {
+    bottom: 16px;
+    right: 16px;
+    left: auto;
+    top: auto;
+    transform: none;
+    align-items: flex-end;
+    --qc-slide: translateX(40px);
+    --qc-origin: bottom right;
+}
+
+/* ─── Shared pill skin (Clonecord-style variants) ──────────── */
+.quest-pill,
+.quest-sub-pill {
+    color: var(--qc-text, #ffffff);
+    box-sizing: border-box;
+    border-radius: var(--qc-radius, 10px);
+    transform-origin: var(--qc-origin, top center);
+    will-change: transform, opacity;
+}
+
+/* Glass (default): blurred, translucent */
+.vc-pill-container:not([data-style]) .quest-pill,
+.vc-pill-container:not([data-style]) .quest-sub-pill,
+.vc-pill-container[data-style="glass"] .quest-pill,
+.vc-pill-container[data-style="glass"] .quest-sub-pill {
+    background: var(--qc-bg, rgba(0, 0, 0, 0.85));
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    border: 1px solid var(--qc-border, rgba(255, 255, 255, 0.1));
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Solid: no blur */
+.vc-pill-container[data-style="solid"] .quest-pill,
+.vc-pill-container[data-style="solid"] .quest-sub-pill {
+    background: var(--qc-bg, rgba(20, 21, 25, 0.95));
+    border: 1px solid var(--qc-border, rgba(255, 255, 255, 0.12));
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* Minimal: flat, no blur, no border — only the accent stripe */
+.vc-pill-container[data-style="minimal"] .quest-pill,
+.vc-pill-container[data-style="minimal"] .quest-sub-pill {
+    background: var(--qc-bg, rgba(0, 0, 0, 0.85));
+    border: 1px solid transparent;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.quest-pill-row {
+    position: relative;
+    display: flex;
+    width: 100%;
+    max-width: var(--qc-max-width, 400px);
+    align-items: center;
+    pointer-events: auto;
+}
+
+/* ─── Main progress pill ──────────────────────────────────── */
+.quest-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    overflow: visible;
+    width: 100%;
+    max-width: var(--qc-max-width, 400px);
+    padding: var(--qc-padding, 8px) calc(var(--qc-padding, 8px) + 4px);
+    margin: 0;
+    animation: questPillEntry 0.35s cubic-bezier(0.25, 1, 0.5, 1) both;
+    transition:
+        transform 0.25s cubic-bezier(0.25, 1, 0.5, 1),
+        opacity 0.25s ease;
+}
+
+.quest-pill:not(.completed):hover {
+    filter: brightness(1.08);
+}
+
+@keyframes questPillEntry {
+    0% {
+        opacity: 0;
+        transform: var(--qc-slide, translateY(-40px)) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(0, 0) scale(1);
+    }
+}
+
+/* exit duration must stay <= closePillElement's 900ms delay in notifications.ts */
+.quest-pill.hiding {
+    animation: questPillExit 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+    pointer-events: none;
+    max-height: 0;
+    overflow: hidden;
+    filter: none;
+}
+
+@keyframes questPillExit {
+    0% {
+        opacity: 1;
+        transform: translate(0, 0) scale(1);
+        max-height: 400px;
+        padding-top: var(--qc-padding, 8px);
+        padding-bottom: var(--qc-padding, 8px);
+        margin-top: 0;
+        margin-bottom: 0;
+        border-width: 1px;
+    }
+    100% {
+        opacity: 0;
+        transform: var(--qc-slide, translateY(-40px)) scale(0.95);
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        margin-top: 0;
+        margin-bottom: 0;
+        border-width: 0;
+    }
+}
+
+/* ─── Compact row (spinner + title + percent) ─────────────── */
+.quest-pill-compact {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+.quest-pill.hiding .quest-pill-compact {
+    justify-content: center !important;
+    gap: 0 !important;
+}
+
+.quest-pill.hiding .quest-pill-title,
+.quest-pill.hiding .quest-pill-percent {
+    opacity: 0 !important;
+    transition: opacity 0.2s ease !important;
+}
+
+.quest-pill.hiding .quest-pill-spinner {
+    opacity: 0 !important;
+    transition: opacity 0.15s ease !important;
+}
+
+.quest-pill.hiding .quest-pill-expanded {
+    opacity: 0 !important;
+    transition: opacity 0.15s ease !important;
+}
+
+.quest-pill:not(.completed):hover .quest-pill-compact {
+    margin-bottom: 10px;
+    transition: margin-bottom 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.quest-pill-title {
+    font-size: var(--qc-font-size, 14px);
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    letter-spacing: -0.01em;
+    line-height: 1.4;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    animation: questTextReveal 0.75s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+.quest-pill-percent {
+    font-weight: 700;
+    font-size: var(--qc-font-size, 14px);
+    color: var(--qc-percent, var(--qc-accent, #5865f2));
+    flex-shrink: 0;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.25s ease;
+    animation: questTextReveal 0.75s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+.quest-pill-timer {
+    font-size: 11px;
+    font-weight: 500;
+    color: color-mix(in srgb, var(--qc-text, #ffffff) 40%, transparent);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+    animation: questTextReveal 0.75s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+@keyframes questTextReveal {
+    0%,
+    45% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* ─── Spinner ─────────────────────────────────────────────── */
+.quest-pill-spinner {
+    width: 15px;
+    height: 15px;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-top-color: var(--qc-accent, #5865f2);
+    border-radius: 50%;
+    flex-shrink: 0;
+    animation:
+        questSpin 0.9s linear infinite,
+        questTextReveal 0.75s both;
+    will-change: transform;
+}
+
+@keyframes questSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ─── Expanded panel (hover) ──────────────────────────────── */
+.quest-pill-expanded {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition:
+        grid-template-rows 0.35s cubic-bezier(0.25, 1, 0.5, 1),
+        opacity 0.25s ease;
+    width: 100%;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.quest-pill:not(.completed):hover .quest-pill-expanded,
+.quest-pill.always-expanded .quest-pill-expanded {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.quest-pill.always-expanded .quest-pill-compact {
+    margin-bottom: 10px;
+}
+
+.quest-pill-expanded-inner {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.quest-pill-body {
+    font-size: 12px;
+    color: color-mix(in srgb, var(--qc-text, #ffffff) 75%, transparent);
+    text-align: center;
+    line-height: 1.5;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    margin-top: 2px;
+}
+
+/* ─── Progress bar ────────────────────────────────────────── */
+.quest-pill-progress-bar {
+    height: 3px;
+    background: var(--qc-bar-bg, rgba(255, 255, 255, 0.1));
+    border-radius: 2px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.quest-pill-progress-fill {
+    height: 100%;
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: left center;
+    background: linear-gradient(
+        90deg,
+        var(--qc-accent, #5865f2),
+        rgba(var(--qc-accent-rgb, 88, 101, 242), 0.55)
+    );
+    border-radius: 2px;
+    transition:
+        transform 0.25s ease,
+        background 0.3s ease;
+    will-change: transform;
+}
+
+.quest-pill-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.quest-btn {
+    background: color-mix(in srgb, var(--qc-text, #ffffff) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--qc-text, #ffffff) 12%, transparent);
+    color: var(--qc-text, #ffffff);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        transform 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.quest-btn:hover {
+    background: color-mix(in srgb, var(--qc-text, #ffffff) 16%, transparent);
+    border-color: rgba(var(--qc-accent-rgb, 88, 101, 242), 0.5);
+    color: var(--qc-text, #ffffff);
+    transform: translateY(-1px);
+}
+
+.quest-btn:active {
+    transform: translateY(0);
+}
+
+/* ─── Main pill: success / error states ───────────────────── */
+.quest-pill.success .quest-pill-spinner {
+    border-color: transparent;
+    animation: none;
+    background: #57f287;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.quest-pill.success .quest-pill-percent {
+    color: #57f287;
+}
+
+.quest-pill.success .quest-pill-progress-fill {
+    background: #57f287;
+    transform: scaleX(1);
+}
+
+.quest-pill.error .quest-pill-spinner {
+    border-color: transparent;
+    animation: none;
+    background: #ed4245;
+    clip-path: polygon(
+        20% 0%,
+        0% 20%,
+        30% 50%,
+        0% 80%,
+        20% 100%,
+        50% 70%,
+        80% 100%,
+        100% 80%,
+        70% 50%,
+        100% 20%,
+        80% 0%,
+        50% 30%
+    );
+}
+
+.quest-pill.error .quest-pill-percent {
+    color: #ed4245;
+}
+
+.quest-pill.error .quest-pill-progress-fill {
+    background: #ed4245;
+    transform: scaleX(1);
+}
+
+/* ─── Slide messages next to an active pill ───────────────── */
+.quest-pill-slide {
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: var(--qc-padding, 8px) calc(var(--qc-padding, 8px) + 4px);
+    border-radius: var(--qc-radius, 24px);
+    background: var(--qc-bg, rgba(0, 0, 0, 0.85));
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    border: 1px solid var(--qc-border, rgba(255, 255, 255, 0.1));
+    border-left: 3px solid var(--qc-accent, #5865f2);
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    white-space: nowrap;
+    transform: translateY(-50%);
+    animation: questSlideIn 0.35s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+.quest-pill-slide.success {
+    border-left-color: #57f287;
+}
+
+.quest-pill-slide.error,
+.quest-pill-slide.cancel {
+    border-left-color: #ed4245;
+}
+
+@keyframes questSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-50%) translateX(-16px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0) scale(1);
+    }
+}
+
+.quest-pill-slide.hiding {
+    animation: questSlideOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+}
+
+@keyframes questSlideOut {
+    0% {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-50%) translateX(-16px) scale(0.95);
+    }
+}
+
+.quest-pill-slide-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    background: rgba(var(--qc-accent-rgb, 88, 101, 242), 0.18);
+    color: var(--qc-accent, #5865f2);
+}
+
+.quest-pill-slide-icon.success {
+    background: rgba(87, 242, 135, 0.15);
+    color: #57f287;
+}
+
+.quest-pill-slide-icon.error,
+.quest-pill-slide-icon.cancel {
+    background: rgba(237, 66, 69, 0.15);
+    color: #ed4245;
+}
+
+.quest-pill-slide-text {
+    font-size: var(--qc-font-size, 14px);
+    font-weight: 600;
+    color: var(--qc-text, #ffffff);
+}
+
+/* ─── Sub toasts ──────────────────────────────────────────── */
+.quest-sub-pill {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    max-width: var(--qc-max-width, 400px);
+    padding: var(--qc-padding, 8px) calc(var(--qc-padding, 8px) + 2px);
+    /* accent stripe like Clonecord sub toasts */
+    border-left: 3px solid var(--qc-accent, #5865f2);
+    pointer-events: auto;
+    animation: questSubPillIn 0.35s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+.quest-sub-pill.success {
+    border-left-color: #57f287;
+}
+
+.quest-sub-pill.error,
+.quest-sub-pill.cancel {
+    border-left-color: #ed4245;
+}
+
+.quest-sub-pill:not(.hiding):hover {
+    filter: brightness(1.1);
+}
+
+@keyframes questSubPillIn {
+    0% {
+        opacity: 0;
+        transform: var(--qc-slide, translateY(-40px)) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(0, 0) scale(1);
+    }
+}
+
+.quest-sub-pill.hiding {
+    animation: questSubPillOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+    pointer-events: none;
+    max-height: 0;
+    overflow: hidden;
+    filter: none;
+}
+
+@keyframes questSubPillOut {
+    0% {
+        opacity: 1;
+        transform: translate(0, 0) scale(1);
+        max-height: 500px;
+        padding-top: var(--qc-padding, 8px);
+        padding-bottom: var(--qc-padding, 8px);
+        margin-top: 0;
+        border-width: 1px;
+    }
+    100% {
+        opacity: 0;
+        transform: var(--qc-slide, translateY(-40px)) scale(0.95);
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        margin-top: 0;
+        border-width: 0;
+    }
+}
+
+/* ─── Toast icon bubble ───────────────────────────────────── */
+.quest-sub-pill-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+    background: rgba(var(--qc-accent-rgb, 88, 101, 242), 0.18);
+    color: var(--qc-accent, #5865f2);
+}
+
+.quest-sub-pill-icon.success {
+    background: rgba(87, 242, 135, 0.15);
+    color: #57f287;
+}
+
+.quest-sub-pill-icon.error,
+.quest-sub-pill-icon.cancel {
+    background: rgba(237, 66, 69, 0.15);
+    color: #ed4245;
+}
+
+/* ─── Toast content ───────────────────────────────────────── */
+.quest-sub-pill-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.quest-sub-pill-title {
+    font-weight: 600;
+    font-size: var(--qc-font-size, 14px);
+    line-height: 1.4;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.quest-sub-pill-body {
+    font-size: 11px;
+    color: color-mix(in srgb, var(--qc-text, #ffffff) 65%, transparent);
+    line-height: 1.4;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* ─── Toast close button ───────────────────────────────────── */
+.quest-toast-close {
+    align-self: flex-start;
+    background: transparent;
+    border: none;
+    color: color-mix(in srgb, var(--qc-text, #ffffff) 40%, transparent);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 6px;
+    margin-left: 2px;
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition:
+        color 0.15s ease,
+        background 0.15s ease;
+}
+
+.quest-toast-close:hover {
+    color: var(--qc-text, #ffffff);
+    background: color-mix(in srgb, var(--qc-text, #ffffff) 8%, transparent);
+}
+
+.vc-questcord-footer {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.vc-questcord-footer-row {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    margin-top: -4px;
+    padding: 0 12px 12px;
+}
+
+.vc-questcord-tile-btn {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+}
+
+.vc-questcord-unsupported-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.vc-questcord-unsupported-btn:disabled:hover {
+    transform: none;
+}
+
+.vc-questcord-queue-button-anchor {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.vc-questcord-queue-button-anchor button {
+    white-space: nowrap;
+}
+
+.vc-questcord-queue-panel {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: 340px;
+    max-width: calc(100vw - 32px);
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    background: var(--background-surface-higher, var(--background-secondary, #2b2d31));
+    box-shadow: var(--shadow-high, 0 8px 16px rgba(0, 0, 0, 0.24));
+    color: var(--text-default, #f2f3f5);
+}
+
+.vc-questcord-queue-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vc-questcord-queue-head-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.vc-questcord-queue-head-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-strong, var(--header-primary, #f2f3f5));
+}
+
+.vc-questcord-queue-head-status {
+    font-size: 12px;
+    color: var(--text-muted, #b5bac1);
+}
+
+.vc-questcord-queue-heading {
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text-subtle, var(--text-muted, #949ba4));
+}
+
+.vc-questcord-queue-segments {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.vc-questcord-queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.vc-questcord-queue-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.vc-questcord-queue-row:hover {
+    background: var(--background-mod-subtle, rgba(255, 255, 255, 0.06));
+}
+
+.vc-questcord-queue-row-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+}
+
+.vc-questcord-queue-row-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-strong, #f2f3f5);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vc-questcord-queue-row-subtitle {
+    font-size: 12px;
+    color: var(--text-muted, #b5bac1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vc-questcord-queue-row-state {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text-muted, #b5bac1);
+}
+
+.vc-questcord-queue-row-btn {
+    flex-shrink: 0;
+}
+
+.vc-questcord-queue-clear {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.vc-questcord-queue-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 96px;
+    padding: 8px 16px;
+    text-align: center;
+}
+
+.vc-questcord-queue-empty-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-strong, #f2f3f5);
+}
+
+.vc-questcord-queue-empty-hint {
+    font-size: 12px;
+    color: var(--text-muted, #b5bac1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .quest-pill,
+    .quest-pill-compact,
+    .quest-pill-spinner,
+    .quest-sub-pill,
+    .quest-pill-slide,
+    .quest-pill.hiding,
+    .quest-sub-pill.hiding {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+    .quest-pill-progress-fill {
+        transition-duration: 0.01ms !important;
+    }
+}
