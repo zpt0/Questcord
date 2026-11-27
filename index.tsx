@@ -95,6 +95,11 @@ import {
 } from "./quests/consoleTracking";
 import { loadStats, resetStatsLoaded } from "./core/history";
 import { getEventQuestId } from "./core/questLogic";
+import {
+    canOpenSupportInvite,
+    checkSupportServerMembership,
+    resetSupportServerMembership,
+} from "./supportServer";
 
 const log = createScopedLogger("index");
 
@@ -417,11 +422,15 @@ export default definePlugin({
     renderFooter,
     renderQuestButton,
     renderQueueButton,
+    // Members must never be sent to the support invite, even if a legacy
+    // setting or a stale localStorage flag says otherwise.
+    canOpenSupportInvite,
     flux: {
         LOGOUT() {
             leaveAccount();
         },
         CONNECTION_OPEN({ user }: { user?: { id?: string } }) {
+            checkSupportServerMembership();
             const id = user?.id ?? currentUserId();
             if (id && id !== getOwner()) enterAccount(id);
         },
@@ -467,6 +476,7 @@ export default definePlugin({
         },
     },
     start() {
+        checkSupportServerMembership();
         enableStyle(questcordStyle);
         void startRuntime((scope) => {
             ensureStyleRootMounted();
@@ -583,6 +593,7 @@ export default definePlugin({
     },
     stop() {
         disableStyle(questcordStyle);
+        resetSupportServerMembership();
         return stopRuntime(() => {
             debugLog(`Plugin stopping...`);
             stopAutoClaim();

@@ -11,7 +11,7 @@ describe("Questcord feature preservation", () => {
     it("preserves plugin identity constants and DataStore keys", () => {
         const constants = source("constants.ts");
         for (const text of [
-            'export const PLUGIN_VERSION = "0.2.1";',
+            'export const PLUGIN_VERSION = "0.1.1";',
             'export const LOG_PREFIX = "[Questcord]";',
             'export const GITHUB_REPO = "zpt0/Questcord";',
             'export const UPDATES_CHANNEL_ID = "1532348047697121340";',

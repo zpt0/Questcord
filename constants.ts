@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-export const PLUGIN_VERSION = "0.2.1";
+export const PLUGIN_VERSION = "0.1.1";
 export const LOG_PREFIX = "[Questcord]";
 export const PLUGIN_AUTHOR = { name: "zpt0.dev", id: 299670891875270656n } as const;
 export const GITHUB_REPO = "zpt0/Questcord";
@@ -29,6 +29,8 @@ export const GITHUB_RELEASE_URL = GITHUB_REPO
 export const UPDATE_CHECK_ENABLED = !!GITHUB_REPO;
 export const UPDATES_CHANNEL_ID = "1532348047697121340";
 export const SUPPORT_INVITE_CODE = "sKTrAMctcy";
+// Support guild resolved from SUPPORT_INVITE_CODE. Membership is checked by id.
+export const SUPPORT_GUILD_ID = "1508481905291558942";
 
 // persisted DataStore keys; renaming orphans saved quests and queue for every user
 export const SAVED_QUESTS_KEY = "questcord-active-quests";
